@@ -1,4 +1,4 @@
-# python_server/app.py (커스텀 예측 API 통합)
+# python_server/app.py (Content-Type 헤더 에러 해결)
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -439,7 +439,7 @@ def predict():
             "error": f"서버 오류 발생: {str(e)}"
         }), 500
 
-# ===== 커스텀 예측 API (NEW) =====
+# ===== 커스텀 예측 API =====
 
 def get_custom_team_stats(team_name: str, year: int = 2025):
     """팀 통계 조회"""
@@ -483,9 +483,13 @@ def get_custom_pitcher_stats(pitcher_name: str, team_name: str, year: int = 2025
         return pd.DataFrame()
 
 
-@app.route('/api/teams-and-pitchers', methods=['GET'])
+@app.route('/api/teams-and-pitchers', methods=['GET', 'OPTIONS'])
 def get_teams_and_pitchers():
     """팀과 투수 목록 조회"""
+    # OPTIONS 요청 처리 (CORS preflight)
+    if request.method == 'OPTIONS':
+        return '', 200
+    
     try:
         log_info("[API] GET /api/teams-and-pitchers")
         
@@ -528,13 +532,34 @@ def get_teams_and_pitchers():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/predict-custom', methods=['POST'])
+@app.route('/api/predict-custom', methods=['POST', 'OPTIONS'])
 def predict_custom():
     """커스텀 경기 예측"""
+    # OPTIONS 요청 처리 (CORS preflight)
+    if request.method == 'OPTIONS':
+        return '', 200
+    
     request_id = f"[{datetime.now().strftime('%H:%M:%S')}]"
     
     try:
-        data = request.get_json()
+        # ===== FIX: Content-Type 검사 추가 =====
+        # Content-Type 헤더 확인
+        content_type = request.headers.get('Content-Type', '')
+        log_debug(f"{request_id} Content-Type: {content_type}")
+        
+        # JSON 데이터 파싱 (더 유연한 방식)
+        if request.is_json:
+            data = request.get_json()
+        elif request.data:
+            try:
+                data = json.loads(request.data)
+            except json.JSONDecodeError:
+                log_error(f"{request_id} Invalid JSON data")
+                return jsonify({'error': 'Invalid JSON data. Please send Content-Type: application/json'}), 400
+        else:
+            log_error(f"{request_id} No data provided")
+            return jsonify({'error': 'No data provided'}), 400
+        
         home_team = data.get('homeTeam')
         away_team = data.get('awayTeam')
         home_pitcher = data.get('homePitcher')
@@ -544,9 +569,11 @@ def predict_custom():
         
         # 유효성 검사
         if not all([home_team, away_team, home_pitcher, away_pitcher]):
-            return jsonify({'error': '모든 필드가 필요합니다.'}), 400
+            log_error(f"{request_id} Missing required fields")
+            return jsonify({'error': '모든 필드가 필요합니다. (homeTeam, awayTeam, homePitcher, awayPitcher)'}), 400
         
         if home_team == away_team:
+            log_error(f"{request_id} Home team and away team are the same")
             return jsonify({'error': '홈 팀과 상대 팀이 같을 수 없습니다.'}), 400
         
         # 데이터 조회 (병렬)
@@ -562,13 +589,17 @@ def predict_custom():
         
         # 데이터 검증
         if home_team_stats.empty:
-            return jsonify({'error': '홈 팀 정보를 찾을 수 없습니다.'}), 400
+            log_error(f"{request_id} Home team not found: {home_team}")
+            return jsonify({'error': f'홈 팀 "{home_team}" 정보를 찾을 수 없습니다.'}), 400
         if away_team_stats.empty:
-            return jsonify({'error': '상대 팀 정보를 찾을 수 없습니다.'}), 400
+            log_error(f"{request_id} Away team not found: {away_team}")
+            return jsonify({'error': f'상대 팀 "{away_team}" 정보를 찾을 수 없습니다.'}), 400
         if home_pitcher_stats.empty:
-            return jsonify({'error': f"홈 팀 투수 '{home_pitcher}' 정보를 찾을 수 없습니다."}), 400
+            log_error(f"{request_id} Home pitcher not found: {home_pitcher}")
+            return jsonify({'error': f'홈 팀 투수 "{home_pitcher}" 정보를 찾을 수 없습니다.'}), 400
         if away_pitcher_stats.empty:
-            return jsonify({'error': f"상대 팀 투수 '{away_pitcher}' 정보를 찾을 수 없습니다."}), 400
+            log_error(f"{request_id} Away pitcher not found: {away_pitcher}")
+            return jsonify({'error': f'상대 팀 투수 "{away_pitcher}" 정보를 찾을 수 없습니다.'}), 400
         
         # 피처 생성
         features_dict = {
@@ -627,6 +658,8 @@ def predict_custom():
         
     except Exception as e:
         log_error(f"{request_id} ❌ Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': f'오류 발생: {str(e)}'}), 500
 
 if __name__ == '__main__':
