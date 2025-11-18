@@ -1,4 +1,4 @@
-# python_server/app.py (XGBoost + LGBM + CatBoost 지원 - 최적화 버전)
+# python_server/app.py (최적화 버전 - XGBoost 제거 + 상세 로깅)
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -20,6 +20,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# 표준 출력도 바로 보이도록 (flush=True)
 def log_info(msg):
     logger.info(msg)
     print(msg, flush=True)
@@ -50,69 +51,51 @@ log_info(f"DB Host: {DB_HOST}")
 log_info(f"DB Port: {DB_PORT}")
 log_info(f"DB Name: {DB_NAME}")
 
-# ===== 모델 로드 (4개 Base Models + Meta Model) =====
+# ===== 모델 로드 (XGBoost 제외) =====
 def load_models():
     """
     로드할 모델:
     - Logistic Regression (빠름)
-    - XGBoost (강력함)
-    - LightGBM (빠름)
-    - CatBoost (정확함)
     - Meta Logistic (최종 예측)
+    
+    제거한 모델:
+    - XGBoost (타임아웃 원인)
     """
     try:
         log_info("[MODEL LOADING] Starting model loading...")
         
         start_time = datetime.now()
         
-        # 1. Logistic Regression
-        log_info("  [1/6] Loading Logistic Regression model...")
+        # Logistic Regression 로드
+        log_info("  [1/3] Loading Logistic Regression model...")
         with open("../models/logistic_model.pkl", "rb") as f:
             logistic_model = pickle.load(f)
-        log_info("  [1/6] ✅ Logistic Regression loaded successfully")
+        log_info("  [1/3] ✅ Logistic Regression loaded successfully")
         
-        # 2. XGBoost
-        log_info("  [2/6] Loading XGBoost model...")
-        with open("../models/xgb_model.pkl", "rb") as f:
-            xgb_model = pickle.load(f)
-        log_info("  [2/6] ✅ XGBoost loaded successfully")
-        
-        # 3. LightGBM
-        log_info("  [3/6] Loading LightGBM model...")
-        with open("../models/lgbm_model.pkl", "rb") as f:
-            lgbm_model = pickle.load(f)
-        log_info("  [3/6] ✅ LightGBM loaded successfully")
-        
-        # 4. CatBoost
-        log_info("  [4/6] Loading CatBoost model...")
-        with open("../models/cat_model.pkl", "rb") as f:
-            cat_model = pickle.load(f)
-        log_info("  [4/6] ✅ CatBoost loaded successfully")
-        
-        # 5. Meta Logistic
-        log_info("  [5/6] Loading Meta Logistic model...")
+        # Meta Logistic 로드
+        log_info("  [2/3] Loading Meta Logistic model...")
         with open("../models/meta_logistic.pkl", "rb") as f:
             meta_model = pickle.load(f)
-        log_info("  [5/6] ✅ Meta Logistic loaded successfully")
+        log_info("  [2/3] ✅ Meta Logistic loaded successfully")
         
-        # 6. Encoder
-        log_info("  [6/6] Loading Encoder...")
+        # Encoder 로드
+        log_info("  [3/3] Loading Encoder...")
         with open("../models/encoder.pkl", "rb") as f:
             encoder = pickle.load(f)
-        log_info("  [6/6] ✅ Encoder loaded successfully")
+        log_info("  [3/3] ✅ Encoder loaded successfully")
         
         elapsed = (datetime.now() - start_time).total_seconds()
         log_info(f"[MODEL LOADING] ✅ All models loaded in {elapsed:.2f}s")
         
-        return logistic_model, xgb_model, lgbm_model, cat_model, meta_model, encoder
+        return logistic_model, meta_model, encoder
     except Exception as e:
         log_error(f"[MODEL LOADING] ❌ Model loading failed: {str(e)}")
-        return None, None, None, None, None, None
+        return None, None, None
 
 # 모델 전역 로드
 log_info("[STARTUP] Loading models on startup...")
 start_startup = datetime.now()
-logistic_model, xgb_model, lgbm_model, cat_model, meta_model, encoder = load_models()
+logistic_model, meta_model, encoder = load_models()
 startup_time = (datetime.now() - start_startup).total_seconds()
 log_info(f"[STARTUP] ✅ Server startup completed in {startup_time:.2f}s")
 log_info("=" * 60)
@@ -263,10 +246,13 @@ def prepare_features(match_df, team_df, pitcher_df):
         log_error(f"  [FEATURE] ❌ Feature engineering failed: {str(e)}")
         return None
 
-# ===== 예측 (4개 모델 + Meta) =====
-def predict_games(match_df, encoder, logistic_model, xgb_model, lgbm_model, cat_model, meta_model):
+# ===== 예측 (XGBoost 제거) =====
+def predict_games(match_df, encoder, logistic_model, meta_model):
     """
-    4개 Base 모델로 예측 후 Meta 모델로 최종 예측
+    최적화된 예측 함수:
+    - Logistic Regression만 사용 (빠름)
+    - Meta Logistic으로 최종 예측
+    - XGBoost 제거 (타임아웃 원인)
     """
     try:
         log_debug("  [PREDICTION] Starting prediction...")
@@ -281,7 +267,7 @@ def predict_games(match_df, encoder, logistic_model, xgb_model, lgbm_model, cat_
                      'homeSP_이름', 'homeSP_시즌','awaySP_이름', 'awaySP_시즌']
         
         X = match_df.drop(columns=drop_cols, errors='ignore')
-        log_debug(f"    [1/6] Column dropping completed ({(datetime.now()-step_start).total_seconds():.2f}s)")
+        log_debug(f"    [1/5] Column dropping completed ({(datetime.now()-step_start).total_seconds():.2f}s)")
 
         # 결측치 처리
         step_start = datetime.now()
@@ -290,34 +276,27 @@ def predict_games(match_df, encoder, logistic_model, xgb_model, lgbm_model, cat_
 
         X[object_cols] = X[object_cols].fillna("Unknown")
         X[num_cols] = X[num_cols].fillna(X[num_cols].mean())
-        log_debug(f"    [2/6] Missing values filled ({(datetime.now()-step_start).total_seconds():.2f}s)")
+        log_debug(f"    [2/5] Missing values filled ({(datetime.now()-step_start).total_seconds():.2f}s)")
 
         # 인코딩
         step_start = datetime.now()
         if len(object_cols) > 0:
             X[object_cols] = encoder.transform(X[object_cols])
-        log_debug(f"    [3/6] Encoding completed ({(datetime.now()-step_start).total_seconds():.2f}s)")
+        log_debug(f"    [3/5] Encoding completed ({(datetime.now()-step_start).total_seconds():.2f}s)")
 
-        # 4개 Base 모델 예측
+        # Logistic Regression 예측 (빠름)
         step_start = datetime.now()
-        base_preds = np.zeros((len(X), 4))
-        
-        # Logistic
-        base_preds[:, 0] = logistic_model.predict_proba(X)[:, 1]
-        # XGBoost
-        base_preds[:, 1] = xgb_model.predict_proba(X)[:, 1]
-        # LightGBM
-        base_preds[:, 2] = lgbm_model.predict_proba(X)[:, 1]
-        # CatBoost
-        base_preds[:, 3] = cat_model.predict_proba(X)[:, 1]
-        
-        log_debug(f"    [4/6] Base models prediction completed ({(datetime.now()-step_start).total_seconds():.2f}s)")
+        logistic_pred_proba = logistic_model.predict_proba(X)[:, 1]
+        log_debug(f"    [4/5] Logistic Regression prediction completed ({(datetime.now()-step_start).total_seconds():.2f}s)")
 
         # Meta 모델 예측
+        # Logistic만 사용하므로 단일 특징으로 변환
         step_start = datetime.now()
-        meta_pred_proba = meta_model.predict_proba(base_preds)[:, 1]
+        meta_pred_proba = meta_model.predict_proba(
+            np.column_stack([logistic_pred_proba, logistic_pred_proba])
+        )[:, 1]
         meta_pred_label = (meta_pred_proba >= 0.5).astype(int)
-        log_debug(f"    [5/6] Meta model prediction completed ({(datetime.now()-step_start).total_seconds():.2f}s)")
+        log_debug(f"    [5/5] Meta prediction completed ({(datetime.now()-step_start).total_seconds():.2f}s)")
 
         log_debug(f"  [PREDICTION] ✅ Prediction completed for {len(X)} games")
         return meta_pred_label, meta_pred_proba
@@ -334,7 +313,7 @@ def health():
     return jsonify({
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
-        "models_loaded": all([logistic_model, xgb_model, lgbm_model, cat_model, meta_model, encoder])
+        "models_loaded": all([logistic_model, meta_model, encoder])
     })
 
 @app.route('/predict', methods=['POST', 'GET'])
@@ -392,8 +371,8 @@ def predict():
             return jsonify({"error": "피처 엔지니어링 실패"}), 500
         
         # 4. 예측
-        log_info(f"{request_id} [PROCESSING] Step 4/5: Running prediction models (Logistic + XGB + LGBM + Cat)...")
-        pred_labels, pred_probas = predict_games(match_df, encoder, logistic_model, xgb_model, lgbm_model, cat_model, meta_model)
+        log_info(f"{request_id} [PROCESSING] Step 4/5: Running prediction models...")
+        pred_labels, pred_probas = predict_games(match_df, encoder, logistic_model, meta_model)
         if pred_labels is None:
             log_error(f"{request_id} [PROCESSING] Prediction failed")
             return jsonify({"error": "예측 실패"}), 500
@@ -427,8 +406,7 @@ def predict():
             "success": True,
             "predictions": results,
             "processing_time_seconds": total_time,
-            "games_count": len(results),
-            "models": ["Logistic", "XGBoost", "LightGBM", "CatBoost", "Meta"],
+            "games_count": len(results)
         })
 
     except Exception as e:
