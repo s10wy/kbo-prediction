@@ -30,16 +30,16 @@ type Pitcher = {
 
 // 구단
 const teams = [
-  { code: '두산', name: '두산 베어스', logo: '/teams/doosan.png' },
-  { code: '삼성', name: '삼성 라이온즈', logo: '/teams/samsung.png' },
-  { code: 'KIA', name: 'KIA 타이거즈', logo: '/teams/kia.png' },
-  { code: '롯데', name: '롯데 자이언츠', logo: '/teams/lotte.png' },
-  { code: 'NC', name: 'NC 다이노스', logo: '/teams/nc.png' },
-  { code: '한화', name: '한화 이글스', logo: '/teams/hanwha.png' },
-  { code: 'LG', name: 'LG 트윈스', logo: '/teams/lg.png' },
-  { code: 'SSG', name: 'SSG 랜더스', logo: '/teams/ssg.png' },
-  { code: 'KT', name: 'KT 위즈', logo: '/teams/kt.png' },
-  { code: '키움', name: '키움 히어로즈', logo: '/teams/kiwoom.png' },
+  { code: '두산', name: '두산 베어스', logo: '/teams/두산.png' },
+  { code: '삼성', name: '삼성 라이온즈', logo: '/teams/삼성.png' },
+  { code: 'KIA', name: 'KIA 타이거즈', logo: '/teams/KIA.png' },
+  { code: '롯데', name: '롯데 자이언츠', logo: '/teams/롯데.png' },
+  { code: 'NC', name: 'NC 다이노스', logo: '/teams/NC.png' },
+  { code: '한화', name: '한화 이글스', logo: '/teams/한화.png' },
+  { code: 'LG', name: 'LG 트윈스', logo: '/teams/LG.png' },
+  { code: 'SSG', name: 'SSG 랜더스', logo: '/teams/SSG.png' },
+  { code: 'KT', name: 'KT 위즈', logo: '/teams/KT.png' },
+  { code: '키움', name: '키움 히어로즈', logo: '/teams/키움.png' }
 ]
 
 export default function PlayersPage() {
