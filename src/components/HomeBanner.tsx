@@ -10,7 +10,7 @@ export default function HomeBanner() {
   const [theme, setTheme] = useState<"light" | "dark">("light");
 
   const menuItems = [
-    { name: "홈", href: "/" },
+    { name: "홈", href: "/main" },
     { name: "시즌정보", href: "/season" },
     { name: "선수정보", href: "/players" },
     { name: "티켓 예매", href: "/tickets" },
