@@ -14,7 +14,7 @@ export default function HomeBanner() {
     { name: "시즌정보", href: "/season" },
     { name: "선수정보", href: "/players" },
     { name: "티켓 예매", href: "/tickets" },
-    { name: "승부 예측", href: "/predict-real-time" },
+    { name: "승부 예측", href: "/predict-select" },
   ];
 
   useEffect(() => {
