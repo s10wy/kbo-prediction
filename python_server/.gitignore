@@ -1,0 +1,14 @@
+# python_server/.gitignore
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+*.egg-info/
+dist/
+build/
+.env
+.env.local
+.DS_Store
