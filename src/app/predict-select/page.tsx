@@ -36,7 +36,7 @@ export default function PredictSelectPage() {
           }}
         >
           {/* 1. 실시간 경기 예측 (커스텀) */}
-          <Link href="/predict-real-time" style={{ textDecoration: 'none' }}>
+          <Link href="/predict-custom" style={{ textDecoration: 'none' }}>
             <div
               style={{
                 padding: '2.5rem',
@@ -134,7 +134,7 @@ export default function PredictSelectPage() {
           </Link>
 
           {/* 2. 이전 경기 예측 (날짜별) */}
-          <Link href="/predict" style={{ textDecoration: 'none' }}>
+          <Link href="/predict-real-time" style={{ textDecoration: 'none' }}>
             <div
               style={{
                 padding: '2.5rem',
@@ -232,7 +232,7 @@ export default function PredictSelectPage() {
           </Link>
 
           {/* 3. 누적 승부 예측 (시즌 전체) */}
-          <Link href="/season" style={{ textDecoration: 'none' }}>
+          <Link href="/predict" style={{ textDecoration: 'none' }}>
             <div
               style={{
                 padding: '2.5rem',
