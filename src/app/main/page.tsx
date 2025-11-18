@@ -1,7 +1,9 @@
 'use client';
+'use client';
 import React from 'react';
 import Link from 'next/link';
 import NewsSection from '@/components/NewsSection';
+import YoutubeSection from '@/components/YoutubeSection';
 import TeamRanksSection from '@/components/TeamRanksSection';
 import DailyGamesSection from '@/components/DailyGamesSection';
 
@@ -12,7 +14,9 @@ export default function MainPage() {
       <section
         style={{
           paddingTop: '120px',
-          padding: '3rem 2rem',
+          paddingRight: '2rem',
+          paddingBottom: '3rem',
+          paddingLeft: '2rem',
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
           color: '#fff',
           textAlign: 'center',
@@ -28,7 +32,7 @@ export default function MainPage() {
       </section>
 
       {/* ===== 메인 컨텐츠 ===== */}
-      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 2rem 2rem' }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto', paddingRight: '2rem', paddingLeft: '2rem', paddingBottom: '2rem' }}>
         {/* 네비게이션 카드 */}
         <section style={{ marginBottom: '3rem' }}>
           <h2 style={{ fontSize: '1.8rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>
@@ -74,6 +78,9 @@ export default function MainPage() {
 
         {/* 뉴스 섹션 */}
         <NewsSection />
+        
+        {/* 유튜브 섹션 */}
+        <YoutubeSection />
 
         {/* 팀 순위 섹션 */}
         <TeamRanksSection />

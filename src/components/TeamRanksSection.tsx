@@ -21,7 +21,7 @@ export default function TeamRanksSection() {
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {
-          setRanks(data.slice(0, 6)); // ✅ 상위 6개만 표시 (배너용)
+          setRanks(data.slice(0, 10)); // ✅ 표시 갯수 설정(배너용)
           setError(null);
         } else {
           setRanks([]);

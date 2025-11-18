@@ -12,3 +12,6 @@ seaborn==0.12.2
 gunicorn==20.1.0
 python-dotenv==1.0.0
 fsspec
+lightgbm==4.0.0
+catboost==1.2.0
+fsspec
