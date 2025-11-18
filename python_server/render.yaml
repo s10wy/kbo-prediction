@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: kbo-prediction-api
+    runtime: python-3.11
+    buildCommand: pip install --no-cache-dir -r python_server/requirements.txt
+    startCommand: >
+      cd python_server && 
+      gunicorn 
+        -w 4 
+        -b 0.0.0.0:$PORT 
+        --timeout 120 
+        --access-logfile - 
+        --error-logfile - 
+        app:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: PIP_DEFAULT_TIMEOUT
+        value: 300
+      - key: PYTHONUNBUFFERED
+        value: true
+      - key: PORT
+        value: 5000
+    buildFilter:
+      paths:
+        - python_server/**
+        - models/**
