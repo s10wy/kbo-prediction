@@ -1,4 +1,4 @@
-# python_server/app.py (pitcher_df 에러 해결 완료 버전)
+# python_server/app.py (커스텀 예측 API 통합)
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -13,8 +13,6 @@ import sys
 import logging
 from concurrent.futures import ThreadPoolExecutor
 import threading
-import re
-
 
 # ===== 로깅 설정 =====
 logging.basicConfig(
@@ -24,34 +22,27 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
 def log_info(msg):
     logger.info(msg)
     print(msg, flush=True)
-
 
 def log_error(msg):
     logger.error(msg)
     print(msg, flush=True)
 
-
 def log_debug(msg):
     logger.debug(msg)
     print(msg, flush=True)
 
-
 app = Flask(__name__)
 CORS(app)
-
 
 # 스레드 풀 설정
 executor = ThreadPoolExecutor(max_workers=2)
 
-
 log_info("=" * 60)
 log_info("🚀 KBO Baseball Prediction Server Starting...")
 log_info("=" * 60)
-
 
 # ===== 환경변수 설정 =====
 DB_USER = os.getenv('DB_USER', 'postgres')
@@ -60,11 +51,9 @@ DB_HOST = os.getenv('DB_HOST', 'kbodata.c5eikyi8u0t0.ap-southeast-2.rds.amazonaw
 DB_PORT = os.getenv('DB_PORT', '5432')
 DB_NAME = os.getenv('DB_NAME', 'postgres')
 
-
 log_info(f"DB Host: {DB_HOST}")
 log_info(f"DB Port: {DB_PORT}")
 log_info(f"DB Name: {DB_NAME}")
-
 
 # ===== 모델 로드 (4개 Base Models + Meta Model) =====
 def load_models():
@@ -125,7 +114,6 @@ def load_models():
         log_error(f"[MODEL LOADING] ❌ Model loading failed: {str(e)}")
         return None, None, None, None, None, None
 
-
 # 모델 전역 로드
 log_info("[STARTUP] Loading models on startup...")
 start_startup = datetime.now()
@@ -133,7 +121,6 @@ logistic_model, xgb_model, lgbm_model, cat_model, meta_model, encoder = load_mod
 startup_time = (datetime.now() - start_startup).total_seconds()
 log_info(f"[STARTUP] ✅ Server startup completed in {startup_time:.2f}s")
 log_info("=" * 60)
-
 
 # ===== DB 함수 =====
 def get_games_by_date(date_str):
@@ -159,7 +146,6 @@ def get_games_by_date(date_str):
         log_error(f"  [DB] ❌ Game data query failed: {str(e)}")
         return pd.DataFrame()
 
-
 def get_team_stats(year):
     """팀 통계를 시즌으로 조회"""
     try:
@@ -182,7 +168,6 @@ def get_team_stats(year):
     except Exception as e:
         log_error(f"  [DB] ❌ Team stats query failed: {str(e)}")
         return pd.DataFrame()
-
 
 def get_pitcher_stats(year):
     """투수 통계를 시즌으로 조회"""
@@ -207,9 +192,8 @@ def get_pitcher_stats(year):
         log_error(f"  [DB] ❌ Pitcher stats query failed: {str(e)}")
         return pd.DataFrame()
 
-
 # ===== 피처 엔지니어링 =====
-def prepare_features(match_df, team_df, pitcher_df_input):
+def prepare_features(match_df, team_df, pitcher_df):
     """데이터 전처리 및 피처 생성"""
     try:
         log_debug("  [FEATURE] Starting feature engineering...")
@@ -217,7 +201,7 @@ def prepare_features(match_df, team_df, pitcher_df_input):
         # 필요한 컬럼만 선택
         team_df = team_df[['팀이름','시즌','랭킹','승률','경기차','연속승패','최근5경기','팀타율','팀득점',
                             '팀홈런','팀OPS','팀평균자책','실책','WHIP','QS','세이브','홀드']]
-        pitcher_df_input = pitcher_df_input[['이름','시즌','팀','평균자책','K/BB','WHIP','QS']]
+        pitcher_df = pitcher_df[['이름','시즌','팀','평균자책','K/BB','WHIP','QS']]
 
         # 날짜 처리
         match_df["날짜"] = pd.to_datetime(match_df["날짜"])
@@ -242,11 +226,11 @@ def prepare_features(match_df, team_df, pitcher_df_input):
                                   how="left")
 
         # 투수 스탯 병합
-        match_df = match_df.merge(pitcher_df_input.add_prefix("homeSP_"), 
+        match_df = match_df.merge(pitcher_df.add_prefix("homeSP_"), 
                                   left_on=["홈선발","홈팀","팀스탯기준연도"], 
                                   right_on=["homeSP_이름","homeSP_팀", "homeSP_시즌"], 
                                   how="left")
-        match_df = match_df.merge(pitcher_df_input.add_prefix("awaySP_"), 
+        match_df = match_df.merge(pitcher_df.add_prefix("awaySP_"), 
                                   left_on=["원정선발","원정팀", "팀스탯기준연도"], 
                                   right_on=["awaySP_이름", "awaySP_팀", "awaySP_시즌"], 
                                   how="left")
@@ -274,7 +258,6 @@ def prepare_features(match_df, team_df, pitcher_df_input):
         log_error(f"  [FEATURE] ❌ Feature engineering failed: {str(e)}")
         return None
 
-
 # ===== 예측 (4개 모델 병렬 + Meta) =====
 def predict_single_model(model, X, model_name):
     """단일 모델 예측 (병렬 처리용)"""
@@ -285,8 +268,7 @@ def predict_single_model(model, X, model_name):
         log_error(f"    [PARALLEL] {model_name} prediction failed: {str(e)}")
         return None
 
-
-def predict_games(match_df, encoder_input, logistic_model_input, xgb_model_input, lgbm_model_input, cat_model_input, meta_model_input):
+def predict_games(match_df, encoder, logistic_model, xgb_model, lgbm_model, cat_model, meta_model):
     """
     4개 Base 모델로 예측 후 Meta 모델로 최종 예측 (병렬화)
     """
@@ -311,15 +293,15 @@ def predict_games(match_df, encoder_input, logistic_model_input, xgb_model_input
 
         # 인코딩
         if len(object_cols) > 0:
-            X[object_cols] = encoder_input.transform(X[object_cols])
+            X[object_cols] = encoder.transform(X[object_cols])
 
         # 4개 Base 모델 예측 (병렬화)
         log_debug(f"    [PARALLEL] Starting parallel prediction with 4 models...")
         futures = {
-            'logistic': executor.submit(predict_single_model, logistic_model_input, X, 'Logistic'),
-            'xgb': executor.submit(predict_single_model, xgb_model_input, X, 'XGBoost'),
-            'lgbm': executor.submit(predict_single_model, lgbm_model_input, X, 'LightGBM'),
-            'cat': executor.submit(predict_single_model, cat_model_input, X, 'CatBoost'),
+            'logistic': executor.submit(predict_single_model, logistic_model, X, 'Logistic'),
+            'xgb': executor.submit(predict_single_model, xgb_model, X, 'XGBoost'),
+            'lgbm': executor.submit(predict_single_model, lgbm_model, X, 'LightGBM'),
+            'cat': executor.submit(predict_single_model, cat_model, X, 'CatBoost'),
         }
         
         base_preds = np.zeros((len(X), 4))
@@ -335,7 +317,7 @@ def predict_games(match_df, encoder_input, logistic_model_input, xgb_model_input
 
         # Meta 모델 예측
         log_debug(f"    [PARALLEL] Running Meta model...")
-        meta_pred_proba = meta_model_input.predict_proba(base_preds)[:, 1]
+        meta_pred_proba = meta_model.predict_proba(base_preds)[:, 1]
         meta_pred_label = (meta_pred_proba >= 0.5).astype(int)
         log_debug(f"  [PREDICTION] ✅ Prediction completed for {len(X)} games")
         
@@ -345,25 +327,15 @@ def predict_games(match_df, encoder_input, logistic_model_input, xgb_model_input
         log_error(f"  [PREDICTION] ❌ Prediction failed: {str(e)}")
         return None, None
 
-
 # ===== API 엔드포인트 =====
-
 @app.route('/health', methods=['GET'])
 def health():
     """서버 상태 확인"""
-    log_info("[API] GET /health")
     return jsonify({
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
-        "models_loaded": all([logistic_model, xgb_model, lgbm_model, cat_model, meta_model, encoder]),
-        "available_endpoints": [
-            "/health",
-            "/predict",
-            "/api/pitchers",
-            "/api/predict-custom"
-        ]
+        "models_loaded": all([logistic_model, xgb_model, lgbm_model, cat_model, meta_model, encoder])
     })
-
 
 @app.route('/predict', methods=['POST', 'GET'])
 def predict():
@@ -390,6 +362,7 @@ def predict():
 
         # 날짜 형식 검증
         date_regex = r'^\d{4}-\d{2}-\d{2}$'
+        import re
         if not re.match(date_regex, date):
             log_error(f"{request_id} [API] Invalid date format: {date}")
             return jsonify({"error": "올바른 날짜 형식이 필요합니다 (YYYY-MM-DD)"}), 400
@@ -411,11 +384,11 @@ def predict():
         team_future = executor.submit(get_team_stats, year)
         pitcher_future = executor.submit(get_pitcher_stats, year)
         team_df = team_future.result(timeout=30)
-        pitcher_df_local = pitcher_future.result(timeout=30)
+        pitcher_df = pitcher_future.result(timeout=30)
         
         # 3. 피처 엔지니어링
         log_info(f"{request_id} [PROCESSING] Step 3/5: Feature engineering...")
-        match_df = prepare_features(match_df, team_df, pitcher_df_local)
+        match_df = prepare_features(match_df, team_df, pitcher_df)
         if match_df is None:
             log_error(f"{request_id} [PROCESSING] Feature engineering failed")
             return jsonify({"error": "피처 엔지니어링 실패"}), 500
@@ -466,245 +439,195 @@ def predict():
             "error": f"서버 오류 발생: {str(e)}"
         }), 500
 
+# ===== 커스텀 예측 API (NEW) =====
 
-# ===== 팀별 투수 조회 API =====
-@app.route('/api/pitchers', methods=['GET'])
-def get_pitchers():
-    """
-    팀별 선발 투수 조회
-    """
+def get_custom_team_stats(team_name: str, year: int = 2025):
+    """팀 통계 조회"""
     try:
-        team = request.args.get('team')
-        season = request.args.get('season', 2025, type=int)
+        engine = create_engine(
+            f'postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}',
+            pool_pre_ping=True,
+            connect_args={'connect_timeout': 10}
+        )
+        query = f"""
+        SELECT * FROM "seasonalTeamStats_Matches"."kbogamesteamsstats"
+        WHERE "팀이름" = '{team_name}' AND "시즌" = {year}
+        LIMIT 1
+        """
+        stats = pd.read_sql(query, engine)
+        engine.dispose()
+        return stats
+    except Exception as e:
+        log_error(f"Failed to get team stats for {team_name}: {str(e)}")
+        return pd.DataFrame()
+
+
+def get_custom_pitcher_stats(pitcher_name: str, team_name: str, year: int = 2025):
+    """투수 통계 조회"""
+    try:
+        engine = create_engine(
+            f'postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}',
+            pool_pre_ping=True,
+            connect_args={'connect_timeout': 10}
+        )
+        query = f"""
+        SELECT * FROM "playerstats"."seasonal_pitcher_stats"
+        WHERE "이름" = '{pitcher_name}' AND "팀" = '{team_name}' AND "시즌" = {year}
+        LIMIT 1
+        """
+        stats = pd.read_sql(query, engine)
+        engine.dispose()
+        return stats
+    except Exception as e:
+        log_error(f"Failed to get pitcher stats for {pitcher_name}: {str(e)}")
+        return pd.DataFrame()
+
+
+@app.route('/api/teams-and-pitchers', methods=['GET'])
+def get_teams_and_pitchers():
+    """팀과 투수 목록 조회"""
+    try:
+        log_info("[API] GET /api/teams-and-pitchers")
         
-        if not team:
-            return jsonify({"error": "team 파라미터가 필요합니다"}), 400
+        engine = create_engine(
+            f'postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}',
+            pool_pre_ping=True,
+            connect_args={'connect_timeout': 10}
+        )
         
-        valid_teams = ['두산', 'KIA', 'LG', 'SK', 'NC', '삼성', '한화', 'SSG', '롯데', 'KT']
-        if team not in valid_teams:
-            return jsonify({"error": f"유효하지 않은 팀: {team}"}), 400
+        # 팀 목록 조회
+        teams_query = 'SELECT DISTINCT "팀이름" as name FROM "seasonalTeamStats_Matches"."kbogamesteamsstats" WHERE "시즌" = 2025'
+        teams_df = pd.read_sql(teams_query, engine)
+        teams = [{'id': t, 'name': t} for t in sorted(teams_df['name'].tolist())]
         
-        log_info(f"[API] Fetching pitchers for team: {team}, season: {season}")
-        
-        # DB에서 투수 데이터 조회
-        pitcher_df_api = get_pitcher_stats(season)
-        
-        if pitcher_df_api.empty:
-            return jsonify({"error": f"{season}년 투수 통계를 찾을 수 없습니다"}), 404
-        
-        # 팀별 투수 필터링
-        team_pitchers = pitcher_df_api[
-            (pitcher_df_api['팀'] == team) & 
-            (pitcher_df_api['시즌'] == season)
-        ].drop_duplicates(subset=['이름'])
-        
-        team_pitchers = team_pitchers.sort_values('평균자책')
-        
-        pitchers_list = []
-        for _, pitcher in team_pitchers.iterrows():
-            pitchers_list.append({
-                "name": str(pitcher['이름']),
-                "era": float(pitcher['평균자책']),
-                "whip": float(pitcher['WHIP']),
-                "kbb": float(pitcher['K/BB']) if pitcher['K/BB'] > 0 else 0,
-                "qs": int(pitcher['QS']) if pd.notna(pitcher['QS']) else 0,
+        # 투수 목록 조회
+        pitchers_query = '''
+        SELECT "이름" as name, "팀" as team, "평균자책" as era, "WHIP" as whip
+        FROM "playerstats"."seasonal_pitcher_stats"
+        WHERE "시즌" = 2025
+        ORDER BY "팀", "이름"
+        '''
+        pitchers_df = pd.read_sql(pitchers_query, engine)
+        pitchers = []
+        for _, row in pitchers_df.iterrows():
+            pitchers.append({
+                'id': f"{row['team']}_{row['name']}",
+                'name': row['name'],
+                'team': row['team'],
+                'era': float(row['era']) if pd.notna(row['era']) else 0.0,
+                'whip': float(row['whip']) if pd.notna(row['whip']) else 0.0,
             })
         
-        log_info(f"[API] Found {len(pitchers_list)} pitchers for {team}")
+        engine.dispose()
         
-        return jsonify({
-            "success": True,
-            "team": team,
-            "season": season,
-            "count": len(pitchers_list),
-            "pitchers": pitchers_list
-        })
-    
+        log_info(f"Found {len(teams)} teams and {len(pitchers)} pitchers")
+        return jsonify({'teams': teams, 'pitchers': pitchers})
+        
     except Exception as e:
-        log_error(f"[API] /api/pitchers failed: {str(e)}")
-        return jsonify({"error": f"서버 오류: {str(e)}"}), 500
+        log_error(f"Failed to get teams and pitchers: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 
-# ===== 커스텀 경기 예측 API =====
 @app.route('/api/predict-custom', methods=['POST'])
 def predict_custom():
-    """
-    사용자가 선택한 경기 예측
-    """
+    """커스텀 경기 예측"""
     request_id = f"[{datetime.now().strftime('%H:%M:%S')}]"
     
     try:
         data = request.get_json()
-        if not data:
-            return jsonify({"error": "요청 본문이 없습니다"}), 400
+        home_team = data.get('homeTeam')
+        away_team = data.get('awayTeam')
+        home_pitcher = data.get('homePitcher')
+        away_pitcher = data.get('awayPitcher')
         
-        home_team = data.get('homeTeam', '').strip()
-        away_team = data.get('awayTeam', '').strip()
-        home_pitcher = data.get('homePitcher', '').strip()
-        away_pitcher = data.get('awayPitcher', '').strip()
+        log_info(f"{request_id} [API] Custom prediction: {home_team} vs {away_team}")
         
-        log_info(f"{request_id} [API] Custom prediction request:")
-        log_info(f"{request_id}   Home: {home_team} ({home_pitcher})")
-        log_info(f"{request_id}   Away: {away_team} ({away_pitcher})")
-        
-        # 입력 검증
-        valid_teams = ['두산', 'KIA', 'LG', 'SK', 'NC', '삼성', '한화', 'SSG', '롯데', 'KT']
-        
-        if not home_team or home_team not in valid_teams:
-            return jsonify({"error": f"유효하지 않은 홈 팀: {home_team}"}), 400
-        
-        if not away_team or away_team not in valid_teams:
-            return jsonify({"error": f"유효하지 않은 상대 팀: {away_team}"}), 400
+        # 유효성 검사
+        if not all([home_team, away_team, home_pitcher, away_pitcher]):
+            return jsonify({'error': '모든 필드가 필요합니다.'}), 400
         
         if home_team == away_team:
-            return jsonify({"error": "홈 팀과 상대 팀이 같을 수 없습니다"}), 400
+            return jsonify({'error': '홈 팀과 상대 팀이 같을 수 없습니다.'}), 400
         
-        if not home_pitcher or not away_pitcher:
-            return jsonify({"error": "선발 투수 정보가 필요합니다"}), 400
+        # 데이터 조회 (병렬)
+        home_team_future = executor.submit(get_custom_team_stats, home_team)
+        away_team_future = executor.submit(get_custom_team_stats, away_team)
+        home_pitcher_future = executor.submit(get_custom_pitcher_stats, home_pitcher, home_team)
+        away_pitcher_future = executor.submit(get_custom_pitcher_stats, away_pitcher, away_team)
         
-        # 현재 시즌 데이터 조회
-        year = datetime.now().year
+        home_team_stats = home_team_future.result(timeout=10)
+        away_team_stats = away_team_future.result(timeout=10)
+        home_pitcher_stats = home_pitcher_future.result(timeout=10)
+        away_pitcher_stats = away_pitcher_future.result(timeout=10)
         
-        log_info(f"{request_id} [PROCESSING] Step 1/5: Loading team stats...")
-        team_df = get_team_stats(year)
-        
-        if team_df.empty:
-            return jsonify({"error": f"{year}년 팀 통계를 찾을 수 없습니다"}), 404
-        
-        log_info(f"{request_id} [PROCESSING] Step 2/5: Loading pitcher stats...")
-        pitcher_df_custom = get_pitcher_stats(year)
-        
-        if pitcher_df_custom.empty:
-            return jsonify({"error": f"{year}년 투수 통계를 찾을 수 없습니다"}), 404
-        
-        # 팀 통계 조회
-        home_stats = team_df[team_df['팀이름'] == home_team]
-        away_stats = team_df[team_df['팀이름'] == away_team]
-        
-        if home_stats.empty or away_stats.empty:
-            return jsonify({"error": "팀 통계를 찾을 수 없습니다"}), 404
-        
-        home_stats = home_stats.iloc[0]
-        away_stats = away_stats.iloc[0]
-        
-        # 투수 통계 조회
-        home_pitcher_stats = pitcher_df_custom[
-            (pitcher_df_custom['이름'] == home_pitcher) & 
-            (pitcher_df_custom['팀'] == home_team)
-        ]
-        
-        away_pitcher_stats = pitcher_df_custom[
-            (pitcher_df_custom['이름'] == away_pitcher) & 
-            (pitcher_df_custom['팀'] == away_team)
-        ]
-        
-        # 투수가 없으면 팀 평균값 사용
+        # 데이터 검증
+        if home_team_stats.empty:
+            return jsonify({'error': '홈 팀 정보를 찾을 수 없습니다.'}), 400
+        if away_team_stats.empty:
+            return jsonify({'error': '상대 팀 정보를 찾을 수 없습니다.'}), 400
         if home_pitcher_stats.empty:
-            log_info(f"{request_id}   [INFO] {home_pitcher} not found in {home_team}, using team average")
-            home_pitcher_stats = {
-                '평균자책': home_stats['팀평균자책'],
-                'WHIP': home_stats['WHIP'],
-                'K/BB': 1.5,
-                'QS': home_stats['QS'],
-            }
-        else:
-            home_pitcher_stats = home_pitcher_stats.iloc[0].to_dict()
-        
+            return jsonify({'error': f"홈 팀 투수 '{home_pitcher}' 정보를 찾을 수 없습니다."}), 400
         if away_pitcher_stats.empty:
-            log_info(f"{request_id}   [INFO] {away_pitcher} not found in {away_team}, using team average")
-            away_pitcher_stats = {
-                '평균자책': away_stats['팀평균자책'],
-                'WHIP': away_stats['WHIP'],
-                'K/BB': 1.5,
-                'QS': away_stats['QS'],
-            }
-        else:
-            away_pitcher_stats = away_pitcher_stats.iloc[0].to_dict()
+            return jsonify({'error': f"상대 팀 투수 '{away_pitcher}' 정보를 찾을 수 없습니다."}), 400
         
         # 피처 생성
-        log_info(f"{request_id} [PROCESSING] Step 3/5: Creating features...")
-        
-        try:
-            features_dict = {
-                'starter_era_diff': float(away_pitcher_stats['평균자책']) - float(home_pitcher_stats['평균자책']),
-                'starter_whip_diff': float(away_pitcher_stats['WHIP']) - float(home_pitcher_stats['WHIP']),
-                'starter_kbb_diff': float(home_pitcher_stats['K/BB']) - float(away_pitcher_stats['K/BB']),
-                'starter_qs_diff': float(home_pitcher_stats['QS']) - float(away_pitcher_stats['QS']),
-                'winrate_diff': float(home_stats['승률']) - float(away_stats['승률']),
-                'ops_diff': float(home_stats['팀OPS']) - float(away_stats['팀OPS']),
-                'era_diff': float(away_stats['팀평균자책']) - float(home_stats['팀평균자책']),
-                'whip_diff': float(away_stats['WHIP']) - float(home_stats['WHIP']),
-                'rank_diff': float(away_stats['랭킹']) - float(home_stats['랭킹']),
-            }
-        except Exception as e:
-            log_error(f"{request_id} [ERROR] Feature creation failed: {str(e)}")
-            return jsonify({"error": f"피처 생성 실패: {str(e)}"}), 500
-        
-        # 예측
-        log_info(f"{request_id} [PROCESSING] Step 4/5: Running predictions (병렬 처리)...")
-        
-        try:
-            X_custom = pd.DataFrame([features_dict])
-            
-            futures = {
-                'logistic': executor.submit(predict_single_model, logistic_model, X_custom, 'Logistic'),
-                'xgboost': executor.submit(predict_single_model, xgb_model, X_custom, 'XGBoost'),
-                'lightgbm': executor.submit(predict_single_model, lgbm_model, X_custom, 'LightGBM'),
-                'catboost': executor.submit(predict_single_model, cat_model, X_custom, 'CatBoost'),
-            }
-            
-            base_preds = np.zeros((1, 4))
-            for idx, (name, future) in enumerate(futures.items()):
-                try:
-                    result = future.result(timeout=60)
-                    if result is not None:
-                        base_preds[0, idx] = result[0]
-                        log_debug(f"    [PARALLEL] ✅ {name} completed")
-                except Exception as e:
-                    log_error(f"    [PARALLEL] ❌ {name} failed: {str(e)}")
-                    return jsonify({"error": f"{name} 예측 실패"}), 500
-            
-            log_debug(f"    [PARALLEL] Running Meta model...")
-            meta_pred_proba = meta_model.predict_proba(base_preds)[0, 1]
-            
-            log_debug(f"  [PREDICTION] ✅ Prediction completed")
-        
-        except Exception as e:
-            log_error(f"{request_id} [ERROR] Prediction failed: {str(e)}")
-            return jsonify({"error": f"예측 실패: {str(e)}"}), 500
-        
-        # 결과 구성
-        log_info(f"{request_id} [PROCESSING] Step 5/5: Formatting results...")
-        
-        pred_team = home_team if meta_pred_proba >= 0.5 else away_team
-        pred_prob = meta_pred_proba if meta_pred_proba >= 0.5 else 1 - meta_pred_proba
-        
-        result = {
-            "success": True,
-            "homeTeam": home_team,
-            "awayTeam": away_team,
-            "homePitcher": home_pitcher,
-            "awayPitcher": away_pitcher,
-            "predictedWinner": pred_team,
-            "predictedProbability": float(pred_prob),
-            "modelDetails": {
-                "logistic": float(base_preds[0, 0]),
-                "xgboost": float(base_preds[0, 1]),
-                "lightgbm": float(base_preds[0, 2]),
-                "catboost": float(base_preds[0, 3]),
-                "meta": float(meta_pred_proba),
-            }
+        features_dict = {
+            'starter_era_diff': float(away_pitcher_stats.get('평균자책', 0).values[0] - home_pitcher_stats.get('평균자책', 0).values[0]),
+            'starter_whip_diff': float(away_pitcher_stats.get('WHIP', 0).values[0] - home_pitcher_stats.get('WHIP', 0).values[0]),
+            'starter_kbb_diff': float(home_pitcher_stats.get('K/BB', 0).values[0] - away_pitcher_stats.get('K/BB', 0).values[0]),
+            'starter_qs_diff': float(home_pitcher_stats.get('QS', 0).values[0] - away_pitcher_stats.get('QS', 0).values[0]),
+            'winrate_diff': float(home_team_stats.get('승률', 0.5).values[0] - away_team_stats.get('승률', 0.5).values[0]),
+            'ops_diff': float(home_team_stats.get('팀OPS', 0).values[0] - away_team_stats.get('팀OPS', 0).values[0]),
+            'era_diff': float(away_team_stats.get('팀평균자책', 0).values[0] - home_team_stats.get('팀평균자책', 0).values[0]),
+            'whip_diff': float(away_team_stats.get('WHIP', 0).values[0] - home_team_stats.get('WHIP', 0).values[0]),
+            'rank_diff': float(away_team_stats.get('랭킹', 5).values[0] - home_team_stats.get('랭킹', 5).values[0]),
         }
         
-        log_info(f"{request_id} [PROCESSING] ✅ Custom prediction completed")
-        log_info(f"{request_id}   Predicted Winner: {pred_team} ({pred_prob*100:.1f}%)")
+        # 피처 배열 생성
+        X = pd.DataFrame([features_dict])
         
-        return jsonify(result)
-    
+        # 4개 모델 병렬 예측
+        futures = {
+            'logistic': executor.submit(predict_single_model, logistic_model, X, 'Logistic'),
+            'xgb': executor.submit(predict_single_model, xgb_model, X, 'XGBoost'),
+            'lgbm': executor.submit(predict_single_model, lgbm_model, X, 'LightGBM'),
+            'cat': executor.submit(predict_single_model, cat_model, X, 'CatBoost'),
+        }
+        
+        base_preds = np.zeros((1, 4))
+        for idx, (name, future) in enumerate(futures.items()):
+            result = future.result(timeout=60)
+            if result is not None:
+                base_preds[0, idx] = result[0]
+        
+        # Meta 모델 예측
+        meta_pred_proba = meta_model.predict_proba(base_preds)[:, 1][0]
+        meta_pred_label = (meta_pred_proba >= 0.5)
+        
+        # 결과 구성
+        predicted_winner = home_team if meta_pred_label else away_team
+        winner_prob = meta_pred_proba if meta_pred_label else (1 - meta_pred_proba)
+        
+        results = [{
+            'gameId': f"custom_{datetime.now().timestamp()}",
+            '날짜': datetime.now().isoformat(),
+            '홈팀': home_team,
+            '원정팀': away_team,
+            '예측승리팀': predicted_winner,
+            '예측확률': float(winner_prob),
+        }]
+        
+        log_info(f"{request_id} ✅ Custom prediction completed: {predicted_winner} ({winner_prob:.2%})")
+        
+        return jsonify({
+            'success': True,
+            'predictions': results,
+            'models': ['Logistic', 'XGBoost', 'LightGBM', 'CatBoost', 'Meta'],
+        })
+        
     except Exception as e:
-        log_error(f"{request_id} [API] ❌ Unhandled exception: {str(e)}")
-        return jsonify({"error": f"서버 오류: {str(e)}"}), 500
-
+        log_error(f"{request_id} ❌ Error: {str(e)}")
+        return jsonify({'error': f'오류 발생: {str(e)}'}), 500
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 10000))

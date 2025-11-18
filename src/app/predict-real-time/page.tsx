@@ -1,128 +1,92 @@
-// src/app/predict-real-time/page.tsx
-
 'use client';
-
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 
-interface Pitcher {
+interface Team {
+  id: string;
   name: string;
+}
+
+interface Pitcher {
+  id: string;
+  name: string;
+  team: string;
   era: number;
   whip: number;
-  kbb: number;
-  qs: number;
 }
 
 interface PredictionResult {
-  success: boolean;
   homeTeam: string;
   awayTeam: string;
   homePitcher: string;
   awayPitcher: string;
   predictedWinner: string;
-  predictedProbability: number;
-  modelDetails: {
-    logistic: number;
-    xgboost: number;
-    lightgbm: number;
-    catboost: number;
-    meta: number;
-  };
-  error?: string;
+  probability: number;
+  confidence: string;
+  timestamp: string;
 }
 
-const TEAMS = ['두산', 'KIA', 'LG', 'SK', 'NC', '삼성', '한화', 'SSG', '롯데', 'KT'];
+export default function PredictRealTimePage() {
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [pitchers, setPitchers] = useState<Pitcher[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [predicting, setPredicting] = useState(false);
 
-export default function PredictRealTime() {
-  // 선택 상태
-  const [homeTeam, setHomeTeam] = useState<string>('');
-  const [awayTeam, setAwayTeam] = useState<string>('');
-  const [homePitcher, setHomePitcher] = useState<string>('');
-  const [awayPitcher, setAwayPitcher] = useState<string>('');
+  // 폼 상태
+  const [homeTeam, setHomeTeam] = useState('');
+  const [awayTeam, setAwayTeam] = useState('');
+  const [homePitcher, setHomePitcher] = useState('');
+  const [awayPitcher, setAwayPitcher] = useState('');
 
-  // 데이터 상태
-  const [homePitchers, setHomePitchers] = useState<Pitcher[]>([]);
-  const [awayPitchers, setAwayPitchers] = useState<Pitcher[]>([]);
-  const [loading, setLoading] = useState(false);
+  // 결과 상태
   const [prediction, setPrediction] = useState<PredictionResult | null>(null);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState('');
+  const [predictionHistory, setPredictionHistory] = useState<PredictionResult[]>([]);
 
-  // 홈 팀 선택 시 투수 로드
+  // 데이터 로드
   useEffect(() => {
-    if (homeTeam) {
-      loadPitchers(homeTeam, 'home');
-      setHomePitcher(''); // 투수 선택 초기화
-    }
-  }, [homeTeam]);
+    fetchTeamsAndPitchers();
+  }, []);
 
-  // 상대 팀 선택 시 투수 로드
-  useEffect(() => {
-    if (awayTeam) {
-      loadPitchers(awayTeam, 'away');
-      setAwayPitcher(''); // 투수 선택 초기화
-    }
-  }, [awayTeam]);
-
-  // 팀별 투수 로드
-  const loadPitchers = async (team: string, type: 'home' | 'away') => {
+  const fetchTeamsAndPitchers = async () => {
     try {
       setLoading(true);
-      const response = await fetch(
-        `/api/pitchers?team=${encodeURIComponent(team)}&season=2025`
-      );
-      
-      if (!response.ok) {
-        throw new Error('투수 데이터를 불러올 수 없습니다');
-      }
-
+      const response = await fetch('/api/teams-and-pitchers');
       const data = await response.json();
       
-      if (type === 'home') {
-        setHomePitchers(data.pitchers || []);
-      } else {
-        setAwayPitchers(data.pitchers || []);
-      }
+      if (data.teams) setTeams(data.teams);
+      if (data.pitchers) setPitchers(data.pitchers);
     } catch (err) {
-      setError(`투수 로드 오류: ${err instanceof Error ? err.message : '알 수 없는 오류'}`);
+      setError('팀과 투수 정보를 불러올 수 없습니다.');
+      console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
   // 예측 수행
-  const handlePredict = async () => {
+  const handlePredict = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setPrediction(null);
+
     // 유효성 검사
-    if (!homeTeam) {
-      setError('홈 팀을 선택해주세요');
+    if (!homeTeam || !awayTeam || !homePitcher || !awayPitcher) {
+      setError('모든 필드를 입력해주세요.');
       return;
     }
-    if (!awayTeam) {
-      setError('상대 팀을 선택해주세요');
-      return;
-    }
+
     if (homeTeam === awayTeam) {
-      setError('홈 팀과 상대 팀이 같을 수 없습니다');
-      return;
-    }
-    if (!homePitcher) {
-      setError('홈 팀 선발 투수를 선택해주세요');
-      return;
-    }
-    if (!awayPitcher) {
-      setError('상대 팀 선발 투수를 선택해주세요');
+      setError('홈 팀과 상대 팀이 같을 수 없습니다.');
       return;
     }
 
     try {
-      setLoading(true);
-      setError('');
-      setPrediction(null);
+      setPredicting(true);
 
       const response = await fetch('/api/predict-custom', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           homeTeam,
           awayTeam,
@@ -131,346 +95,511 @@ export default function PredictRealTime() {
         }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || '예측에 실패했습니다');
+        setError(data.error || '예측에 실패했습니다.');
+        return;
       }
 
-      const result: PredictionResult = await response.json();
+      const result: PredictionResult = {
+        homeTeam,
+        awayTeam,
+        homePitcher,
+        awayPitcher,
+        predictedWinner: data.predictions[0]?.예측승리팀 || '불명',
+        probability: data.predictions[0]?.예측확률 || 0,
+        confidence:
+          (data.predictions[0]?.예측확률 || 0) > 0.55
+            ? '높음'
+            : (data.predictions[0]?.예측확률 || 0) > 0.5
+            ? '보통'
+            : '낮음',
+        timestamp: new Date().toLocaleTimeString('ko-KR'),
+      };
+
       setPrediction(result);
+      setPredictionHistory([result, ...predictionHistory.slice(0, 9)]);
     } catch (err) {
-      setError(`예측 오류: ${err instanceof Error ? err.message : '알 수 없는 오류'}`);
+      setError('예측 중 오류가 발생했습니다.');
+      console.error(err);
     } finally {
-      setLoading(false);
+      setPredicting(false);
     }
   };
 
+  const getConfidenceColor = (confidence: string) => {
+    switch (confidence) {
+      case '높음':
+        return '#10b981';
+      case '보통':
+        return '#f59e0b';
+      case '낮음':
+        return '#ef4444';
+      default:
+        return '#6b7280';
+    }
+  };
+
+  const getProbabilityPercentage = (prob: number) => {
+    return Math.round(prob * 100);
+  };
+
   return (
-    <main style={{ minHeight: '100vh', backgroundColor: '#f5f7fa', padding: '2rem' }}>
+    <main style={{ minHeight: '100vh', backgroundColor: '#f9fafb', paddingTop: '80px' }}>
       {/* 헤더 */}
-      <div style={{ maxWidth: '1200px', margin: '0 auto', marginBottom: '2rem' }}>
-        <Link href="/" style={{ textDecoration: 'none' }}>
-          <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#333', marginBottom: '0.5rem' }}>
-            🔮 실시간 경기 예측
-          </h1>
-        </Link>
-        <p style={{ fontSize: '1.1rem', color: '#666', opacity: 0.8 }}>
-          홈 팀, 상대 팀, 선발 투수를 선택하여 경기 결과를 예측합니다
+      <section
+        style={{
+          padding: '3rem 2rem',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          color: '#fff',
+          textAlign: 'center',
+          marginBottom: '2rem',
+        }}
+      >
+        <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
+          🔮 실시간 경기 예측
+        </h1>
+        <p style={{ fontSize: '1.1rem', opacity: 0.95 }}>
+          팀과 선발 투수를 선택하고 경기 결과를 예측해보세요
         </p>
-      </div>
+      </section>
 
-      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-        {/* 예측 폼 */}
-        <div
-          style={{
-            backgroundColor: '#fff',
-            padding: '2rem',
-            borderRadius: '12px',
-            boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
-            marginBottom: '2rem',
-          }}
-        >
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem', color: '#333' }}>
-            ⚾ 경기 정보 입력
-          </h2>
-
-          {/* 에러 메시지 */}
-          {error && (
-            <div
-              style={{
-                backgroundColor: '#fee',
-                borderLeft: '4px solid #f00',
-                padding: '1rem',
-                marginBottom: '1.5rem',
-                borderRadius: '4px',
-                color: '#c33',
-              }}
-            >
-              {error}
-            </div>
-          )}
-
-          {/* 입력 폼 */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '2rem' }}>
-            {/* 홈 팀 섹션 */}
-            <div>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#333' }}>
-                🏠 홈 팀
-              </h3>
-
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: '#666' }}>
-                팀 선택
-              </label>
-              <select
-                value={homeTeam}
-                onChange={(e) => setHomeTeam(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  marginBottom: '1rem',
-                  borderRadius: '6px',
-                  border: '2px solid #ddd',
-                  fontSize: '1rem',
-                  cursor: 'pointer',
-                  backgroundColor: '#fff',
-                }}
-              >
-                <option value="">팀을 선택하세요</option>
-                {TEAMS.map((team) => (
-                  <option key={team} value={team}>
-                    {team}
-                  </option>
-                ))}
-              </select>
-
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: '#666' }}>
-                선발 투수
-              </label>
-              <select
-                value={homePitcher}
-                onChange={(e) => setHomePitcher(e.target.value)}
-                disabled={!homeTeam || homePitchers.length === 0}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: '6px',
-                  border: '2px solid #ddd',
-                  fontSize: '1rem',
-                  cursor: homePitchers.length > 0 ? 'pointer' : 'not-allowed',
-                  backgroundColor: homePitchers.length > 0 ? '#fff' : '#f0f0f0',
-                  opacity: homePitchers.length > 0 ? 1 : 0.5,
-                }}
-              >
-                <option value="">
-                  {loading ? '로드 중...' : '투수를 선택하세요'}
-                </option>
-                {homePitchers.map((pitcher) => (
-                  <option key={pitcher.name} value={pitcher.name}>
-                    {pitcher.name} (ERA: {pitcher.era.toFixed(2)}, WHIP: {pitcher.whip.toFixed(2)})
-                  </option>
-                ))}
-              </select>
-
-              {homePitcher && homePitchers.find((p) => p.name === homePitcher) && (
-                <div style={{ marginTop: '1rem', padding: '0.75rem', backgroundColor: '#f0f7ff', borderRadius: '6px' }}>
-                  <p style={{ margin: '0.25rem 0', fontSize: '0.9rem', color: '#333' }}>
-                    <strong>선택된 투수:</strong> {homePitcher}
-                  </p>
-                  {(() => {
-                    const pitcher = homePitchers.find((p) => p.name === homePitcher)!;
-                    return (
-                      <>
-                        <p style={{ margin: '0.25rem 0', fontSize: '0.9rem', color: '#666' }}>
-                          ERA: {pitcher.era.toFixed(2)} | WHIP: {pitcher.whip.toFixed(2)}
-                        </p>
-                        <p style={{ margin: '0.25rem 0', fontSize: '0.9rem', color: '#666' }}>
-                          K/BB: {pitcher.kbb.toFixed(2)} | QS: {pitcher.qs}
-                        </p>
-                      </>
-                    );
-                  })()}
-                </div>
-              )}
-            </div>
-
-            {/* 상대 팀 섹션 */}
-            <div>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#333' }}>
-                ✈️ 상대 팀
-              </h3>
-
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: '#666' }}>
-                팀 선택
-              </label>
-              <select
-                value={awayTeam}
-                onChange={(e) => setAwayTeam(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  marginBottom: '1rem',
-                  borderRadius: '6px',
-                  border: '2px solid #ddd',
-                  fontSize: '1rem',
-                  cursor: 'pointer',
-                  backgroundColor: '#fff',
-                }}
-              >
-                <option value="">팀을 선택하세요</option>
-                {TEAMS.filter((team) => team !== homeTeam).map((team) => (
-                  <option key={team} value={team}>
-                    {team}
-                  </option>
-                ))}
-              </select>
-
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: '#666' }}>
-                선발 투수
-              </label>
-              <select
-                value={awayPitcher}
-                onChange={(e) => setAwayPitcher(e.target.value)}
-                disabled={!awayTeam || awayPitchers.length === 0}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: '6px',
-                  border: '2px solid #ddd',
-                  fontSize: '1rem',
-                  cursor: awayPitchers.length > 0 ? 'pointer' : 'not-allowed',
-                  backgroundColor: awayPitchers.length > 0 ? '#fff' : '#f0f0f0',
-                  opacity: awayPitchers.length > 0 ? 1 : 0.5,
-                }}
-              >
-                <option value="">
-                  {loading ? '로드 중...' : '투수를 선택하세요'}
-                </option>
-                {awayPitchers.map((pitcher) => (
-                  <option key={pitcher.name} value={pitcher.name}>
-                    {pitcher.name} (ERA: {pitcher.era.toFixed(2)}, WHIP: {pitcher.whip.toFixed(2)})
-                  </option>
-                ))}
-              </select>
-
-              {awayPitcher && awayPitchers.find((p) => p.name === awayPitcher) && (
-                <div style={{ marginTop: '1rem', padding: '0.75rem', backgroundColor: '#f0f7ff', borderRadius: '6px' }}>
-                  <p style={{ margin: '0.25rem 0', fontSize: '0.9rem', color: '#333' }}>
-                    <strong>선택된 투수:</strong> {awayPitcher}
-                  </p>
-                  {(() => {
-                    const pitcher = awayPitchers.find((p) => p.name === awayPitcher)!;
-                    return (
-                      <>
-                        <p style={{ margin: '0.25rem 0', fontSize: '0.9rem', color: '#666' }}>
-                          ERA: {pitcher.era.toFixed(2)} | WHIP: {pitcher.whip.toFixed(2)}
-                        </p>
-                        <p style={{ margin: '0.25rem 0', fontSize: '0.9rem', color: '#666' }}>
-                          K/BB: {pitcher.kbb.toFixed(2)} | QS: {pitcher.qs}
-                        </p>
-                      </>
-                    );
-                  })()}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* 예측 버튼 */}
-          <button
-            onClick={handlePredict}
-            disabled={loading}
-            style={{
-              width: '100%',
-              padding: '1rem',
-              backgroundColor: loading ? '#ccc' : '#667eea',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '1.1rem',
-              fontWeight: 'bold',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              transition: 'all 0.3s ease',
-              opacity: loading ? 0.7 : 1,
-            }}
-            onMouseOver={(e) => {
-              if (!loading) {
-                (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#764ba2';
-                (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-2px)';
-              }
-            }}
-            onMouseOut={(e) => {
-              if (!loading) {
-                (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#667eea';
-                (e.currentTarget as HTMLButtonElement).style.transform = 'none';
-              }
-            }}
-          >
-            {loading ? '예측 중...' : '🔮 예측 수행'}
-          </button>
-        </div>
-
-        {/* 예측 결과 */}
-        {prediction && (
+      {/* 메인 컨텐츠 */}
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 2rem 2rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '2rem' }}>
+          {/* 예측 폼 */}
           <div
             style={{
-              backgroundColor: '#fff',
               padding: '2rem',
+              backgroundColor: '#fff',
               borderRadius: '12px',
               boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
             }}
           >
             <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem', color: '#333' }}>
-              📊 예측 결과
+              ⚾ 예측 설정
             </h2>
 
-            {/* 메인 결과 */}
+            <form onSubmit={handlePredict}>
+              {/* 홈 팀 선택 */}
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                    fontWeight: 'bold',
+                    color: '#333',
+                    fontSize: '0.95rem',
+                  }}
+                >
+                  🏠 홈 팀
+                </label>
+                <select
+                  value={homeTeam}
+                  onChange={(e) => setHomeTeam(e.target.value)}
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '8px',
+                    border: '2px solid #667eea',
+                    fontSize: '1rem',
+                    backgroundColor: '#fff',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    opacity: loading ? 0.6 : 1,
+                  }}
+                >
+                  <option value="">팀 선택...</option>
+                  {teams.map((team) => (
+                    <option key={team.id} value={team.name}>
+                      {team.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 홈 투수 선택 */}
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                    fontWeight: 'bold',
+                    color: '#333',
+                    fontSize: '0.95rem',
+                  }}
+                >
+                  👤 홈 팀 선발 투수
+                </label>
+                <select
+                  value={homePitcher}
+                  onChange={(e) => setHomePitcher(e.target.value)}
+                  disabled={loading || !homeTeam}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '8px',
+                    border: '2px solid #667eea',
+                    fontSize: '1rem',
+                    backgroundColor: '#fff',
+                    cursor: loading || !homeTeam ? 'not-allowed' : 'pointer',
+                    opacity: loading || !homeTeam ? 0.6 : 1,
+                  }}
+                >
+                  <option value="">투수 선택...</option>
+                  {pitchers
+                    .filter((p) => p.team === homeTeam)
+                    .map((pitcher) => (
+                      <option key={pitcher.id} value={pitcher.name}>
+                        {pitcher.name} (ERA: {pitcher.era.toFixed(2)})
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              {/* 상대 팀 선택 */}
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                    fontWeight: 'bold',
+                    color: '#333',
+                    fontSize: '0.95rem',
+                  }}
+                >
+                  ✈️ 상대 팀
+                </label>
+                <select
+                  value={awayTeam}
+                  onChange={(e) => setAwayTeam(e.target.value)}
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '8px',
+                    border: '2px solid #764ba2',
+                    fontSize: '1rem',
+                    backgroundColor: '#fff',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    opacity: loading ? 0.6 : 1,
+                  }}
+                >
+                  <option value="">팀 선택...</option>
+                  {teams.map((team) => (
+                    <option key={team.id} value={team.name}>
+                      {team.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 상대 투수 선택 */}
+              <div style={{ marginBottom: '2rem' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                    fontWeight: 'bold',
+                    color: '#333',
+                    fontSize: '0.95rem',
+                  }}
+                >
+                  👤 상대 팀 선발 투수
+                </label>
+                <select
+                  value={awayPitcher}
+                  onChange={(e) => setAwayPitcher(e.target.value)}
+                  disabled={loading || !awayTeam}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '8px',
+                    border: '2px solid #764ba2',
+                    fontSize: '1rem',
+                    backgroundColor: '#fff',
+                    cursor: loading || !awayTeam ? 'not-allowed' : 'pointer',
+                    opacity: loading || !awayTeam ? 0.6 : 1,
+                  }}
+                >
+                  <option value="">투수 선택...</option>
+                  {pitchers
+                    .filter((p) => p.team === awayTeam)
+                    .map((pitcher) => (
+                      <option key={pitcher.id} value={pitcher.name}>
+                        {pitcher.name} (ERA: {pitcher.era.toFixed(2)})
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              {/* 에러 메시지 */}
+              {error && (
+                <div
+                  style={{
+                    padding: '1rem',
+                    backgroundColor: '#fee2e2',
+                    color: '#991b1b',
+                    borderRadius: '8px',
+                    marginBottom: '1rem',
+                    fontSize: '0.95rem',
+                  }}
+                >
+                  ⚠️ {error}
+                </div>
+              )}
+
+              {/* 예측 버튼 */}
+              <button
+                type="submit"
+                disabled={predicting || loading || !homeTeam || !awayTeam || !homePitcher || !awayPitcher}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  backgroundColor: predicting ? '#9ca3af' : '#667eea',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '1rem',
+                  fontWeight: 'bold',
+                  cursor: predicting ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.3s ease',
+                  opacity: predicting ? 0.7 : 1,
+                }}
+                onMouseOver={(e) => {
+                  if (!predicting)
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#5a67d8';
+                }}
+                onMouseOut={(e) => {
+                  if (!predicting)
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#667eea';
+                }}
+              >
+                {predicting ? '⏳ 예측 중...' : '🔮 예측 실행'}
+              </button>
+            </form>
+          </div>
+
+          {/* 예측 결과 */}
+          {prediction && (
             <div
               style={{
-                backgroundColor: '#f0f7ff',
-                padding: '1.5rem',
-                borderRadius: '8px',
-                marginBottom: '1.5rem',
-                borderLeft: '4px solid #667eea',
+                padding: '2rem',
+                backgroundColor: '#fff',
+                borderRadius: '12px',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
               }}
             >
-              <p style={{ fontSize: '1rem', color: '#666', marginBottom: '0.5rem' }}>
-                <strong>경기:</strong> {prediction.homeTeam} ({prediction.homePitcher}) vs {prediction.awayTeam} ({prediction.awayPitcher})
-              </p>
-              <p style={{ fontSize: '1.3rem', color: '#333', fontWeight: 'bold', marginBottom: '0.5rem' }}>
-                🏆 예측 승리팀: <span style={{ color: '#667eea' }}>{prediction.predictedWinner}</span>
-              </p>
-              <p style={{ fontSize: '1.1rem', color: '#666' }}>
-                예측 확률: <span style={{ fontWeight: 'bold', color: '#667eea' }}>
-                  {(prediction.predictedProbability * 100).toFixed(1)}%
-                </span>
-              </p>
-            </div>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem', color: '#333' }}>
+                📊 예측 결과
+              </h2>
 
-            {/* 모델별 상세 결과 */}
-            <div>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '1rem', color: '#333' }}>
-                🤖 모델별 예측 확률
-              </h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                {Object.entries(prediction.modelDetails).map(([model, prob]) => (
+              {/* 매치업 정보 */}
+              <div
+                style={{
+                  padding: '1rem',
+                  backgroundColor: '#f3f4f6',
+                  borderRadius: '8px',
+                  marginBottom: '1.5rem',
+                }}
+              >
+                <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.5rem' }}>
+                  {prediction.homeTeam} vs {prediction.awayTeam}
+                </div>
+                <div style={{ fontSize: '0.8rem', color: '#999', marginBottom: '0.5rem' }}>
+                  {prediction.homePitcher} vs {prediction.awayPitcher}
+                </div>
+              </div>
+
+              {/* 예측 승리팀 */}
+              <div style={{ marginBottom: '1.5rem' }}>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 'bold', color: '#666', marginBottom: '0.5rem' }}>
+                  예측 승리팀
+                </h3>
+                <div
+                  style={{
+                    fontSize: '1.8rem',
+                    fontWeight: 'bold',
+                    color: '#667eea',
+                  }}
+                >
+                  {prediction.predictedWinner}
+                </div>
+              </div>
+
+              {/* 승리 확률 */}
+              <div style={{ marginBottom: '1.5rem' }}>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 'bold', color: '#666', marginBottom: '0.5rem' }}>
+                  승리 확률
+                </h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                   <div
-                    key={model}
                     style={{
-                      backgroundColor: '#f9f9f9',
-                      padding: '1rem',
-                      borderRadius: '6px',
-                      borderTop: '3px solid #667eea',
+                      flex: 1,
+                      height: '30px',
+                      backgroundColor: '#e5e7eb',
+                      borderRadius: '15px',
+                      overflow: 'hidden',
                     }}
                   >
-                    <p style={{ margin: '0', fontSize: '0.9rem', color: '#666', marginBottom: '0.5rem' }}>
-                      <strong>{model.toUpperCase()}:</strong>
-                    </p>
-                    <div style={{ backgroundColor: '#e8eef7', height: '8px', borderRadius: '4px', overflow: 'hidden' }}>
-                      <div
-                        style={{
-                          backgroundColor: '#667eea',
-                          height: '100%',
-                          width: `${prob * 100}%`,
-                          transition: 'width 0.3s ease',
-                        }}
-                      />
+                    <div
+                      style={{
+                        height: '100%',
+                        width: `${getProbabilityPercentage(prediction.probability)}%`,
+                        backgroundColor: '#667eea',
+                        transition: 'width 0.3s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#fff',
+                        fontSize: '0.8rem',
+                        fontWeight: 'bold',
+                      }}
+                    >
+                      {getProbabilityPercentage(prediction.probability) > 20 &&
+                        `${getProbabilityPercentage(prediction.probability)}%`}
                     </div>
-                    <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem', color: '#333', fontWeight: 'bold' }}>
-                      {(prob * 100).toFixed(1)}%
-                    </p>
                   </div>
-                ))}
+                  <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#333', minWidth: '60px' }}>
+                    {getProbabilityPercentage(prediction.probability)}%
+                  </div>
+                </div>
+              </div>
+
+              {/* 신뢰도 */}
+              <div style={{ marginBottom: '1rem' }}>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 'bold', color: '#666', marginBottom: '0.5rem' }}>
+                  신뢰도
+                </h3>
+                <div
+                  style={{
+                    display: 'inline-block',
+                    padding: '0.5rem 1rem',
+                    backgroundColor: getConfidenceColor(prediction.confidence),
+                    color: '#fff',
+                    borderRadius: '20px',
+                    fontSize: '0.95rem',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  {prediction.confidence}
+                </div>
+              </div>
+
+              {/* 시간 */}
+              <div style={{ fontSize: '0.8rem', color: '#999', marginTop: '1rem' }}>
+                🕐 예측 시간: {prediction.timestamp}
               </div>
             </div>
+          )}
+        </div>
 
-            {/* 해석 가이드 */}
-            <div style={{ marginTop: '1.5rem', padding: '1rem', backgroundColor: '#fef9e7', borderRadius: '6px' }}>
-              <p style={{ margin: '0', fontSize: '0.9rem', color: '#666' }}>
-                💡 <strong>팁:</strong> 여러 모델의 예측을 앙상블하여 최종 예측을 도출합니다. 각 모델의 확률이 높을수록 더 신뢰할 수 있는 예측입니다.
-              </p>
+        {/* 예측 히스토리 */}
+        {predictionHistory.length > 0 && (
+          <div
+            style={{
+              marginTop: '2rem',
+              padding: '2rem',
+              backgroundColor: '#fff',
+              borderRadius: '12px',
+              boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
+            }}
+          >
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem', color: '#333' }}>
+              📜 예측 히스토리
+            </h2>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #667eea' }}>
+                    <th style={{ padding: '1rem', textAlign: 'left', color: '#666', fontWeight: 'bold' }}>
+                      경기
+                    </th>
+                    <th style={{ padding: '1rem', textAlign: 'left', color: '#666', fontWeight: 'bold' }}>
+                      예측 승리팀
+                    </th>
+                    <th style={{ padding: '1rem', textAlign: 'left', color: '#666', fontWeight: 'bold' }}>
+                      확률
+                    </th>
+                    <th style={{ padding: '1rem', textAlign: 'left', color: '#666', fontWeight: 'bold' }}>
+                      신뢰도
+                    </th>
+                    <th style={{ padding: '1rem', textAlign: 'left', color: '#666', fontWeight: 'bold' }}>
+                      시간
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {predictionHistory.map((pred, idx) => (
+                    <tr
+                      key={idx}
+                      style={{
+                        borderBottom: '1px solid #e5e7eb',
+                        backgroundColor: idx % 2 === 0 ? '#fff' : '#f9fafb',
+                      }}
+                    >
+                      <td style={{ padding: '1rem', color: '#333', fontSize: '0.9rem' }}>
+                        {pred.homeTeam} vs {pred.awayTeam}
+                      </td>
+                      <td style={{ padding: '1rem', color: '#333', fontWeight: 'bold' }}>
+                        {pred.predictedWinner}
+                      </td>
+                      <td style={{ padding: '1rem', color: '#667eea', fontWeight: 'bold' }}>
+                        {getProbabilityPercentage(pred.probability)}%
+                      </td>
+                      <td style={{ padding: '1rem' }}>
+                        <span
+                          style={{
+                            padding: '0.25rem 0.75rem',
+                            backgroundColor: getConfidenceColor(pred.confidence),
+                            color: '#fff',
+                            borderRadius: '12px',
+                            fontSize: '0.8rem',
+                            fontWeight: 'bold',
+                          }}
+                        >
+                          {pred.confidence}
+                        </span>
+                      </td>
+                      <td style={{ padding: '1rem', color: '#999', fontSize: '0.85rem' }}>
+                        {pred.timestamp}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
+
+        {/* 기본 예측으로 돌아가기 */}
+        <div style={{ marginTop: '2rem', textAlign: 'center' }}>
+          <Link href="/predict" style={{ textDecoration: 'none' }}>
+            <button
+              style={{
+                padding: '0.75rem 1.5rem',
+                backgroundColor: '#764ba2',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '0.95rem',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+              }}
+              onMouseOver={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#6d3fa0';
+              }}
+              onMouseOut={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#764ba2';
+              }}
+            >
+              📊 기본 예측으로 이동
+            </button>
+          </Link>
+        </div>
       </div>
     </main>
   );
