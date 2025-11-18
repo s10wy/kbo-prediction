@@ -1,4 +1,3 @@
-// src/app/page.tsx
 'use client';
 import React from 'react';
 import Link from 'next/link';
@@ -399,8 +398,29 @@ export default function IntroPage() {
   );
 }
 
+// ===== 타입 정의 =====
+interface FeatureCardProps {
+  icon: string;
+  title: string;
+  description: string;
+  stats: string;
+}
+
+interface TechStackProps {
+  title: string;
+  items: string[];
+}
+
+interface ModelInfoProps {
+  name: string;
+  description: string;
+  accuracy: string;
+  speed: string;
+  status: string;
+}
+
 // ===== 컴포넌트 =====
-function FeatureCard({ icon, title, description, stats }) {
+function FeatureCard({ icon, title, description, stats }: FeatureCardProps) {
   return (
     <div
       style={{
@@ -440,7 +460,7 @@ function FeatureCard({ icon, title, description, stats }) {
   );
 }
 
-function TechStack({ title, items }) {
+function TechStack({ title, items }: TechStackProps) {
   return (
     <div
       style={{
@@ -454,7 +474,7 @@ function TechStack({ title, items }) {
         {title}
       </h3>
       <ul style={{ listStyle: 'none', padding: 0 }}>
-        {items.map((item, i) => (
+        {items.map((item: string, i: number) => (
           <li key={i} style={{ padding: '0.5rem 0', color: '#666' }}>
             ✓ {item}
           </li>
@@ -464,7 +484,7 @@ function TechStack({ title, items }) {
   );
 }
 
-function ModelInfo({ name, description, accuracy, speed, status }) {
+function ModelInfo({ name, description, accuracy, speed, status }: ModelInfoProps) {
   return (
     <div
       style={{
