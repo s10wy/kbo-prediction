@@ -11,4 +11,3 @@ catboost==1.2.0
 lightgbm==4.0.0
 gunicorn==20.1.0
 python-dotenv==1.0.0
-

@@ -21,13 +21,14 @@ interface PredictionResult {
   awayTeam: string;
   homePitcher: string;
   awayPitcher: string;
+  stadium: string; // 구장 추가
   predictedWinner: string;
   probability: number;
   confidence: string;
   timestamp: string;
 }
 
-export default function PredictRealTimePage() {
+export default function PredictCustomPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [pitchers, setPitchers] = useState<Pitcher[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,16 +39,41 @@ export default function PredictRealTimePage() {
   const [awayTeam, setAwayTeam] = useState('');
   const [homePitcher, setHomePitcher] = useState('');
   const [awayPitcher, setAwayPitcher] = useState('');
+  const [stadium, setStadium] = useState('수원'); // 구장 상태 추가
 
   // 결과 상태
   const [prediction, setPrediction] = useState<PredictionResult | null>(null);
   const [error, setError] = useState('');
   const [predictionHistory, setPredictionHistory] = useState<PredictionResult[]>([]);
 
+  // 구장 목록
+  const stadiums = [
+    '수원', '잠실', '고척', '인천', '대구', '광주', '대전', '창원', '부산', '문학'
+  ];
+
   // 데이터 로드
   useEffect(() => {
     fetchTeamsAndPitchers();
+    loadHistoryFromStorage(); // localStorage에서 히스토리 불러오기
   }, []);
+
+  // 히스토리 저장
+  useEffect(() => {
+    if (predictionHistory.length > 0) {
+      localStorage.setItem('predictionHistory', JSON.stringify(predictionHistory));
+    }
+  }, [predictionHistory]);
+
+  const loadHistoryFromStorage = () => {
+    const saved = localStorage.getItem('predictionHistory');
+    if (saved) {
+      try {
+        setPredictionHistory(JSON.parse(saved));
+      } catch (e) {
+        console.error('Failed to load history:', e);
+      }
+    }
+  };
 
   const fetchTeamsAndPitchers = async () => {
     try {
@@ -93,6 +119,7 @@ export default function PredictRealTimePage() {
           awayTeam,
           homePitcher,
           awayPitcher,
+          stadium, // 구장 정보 추가
         }),
       });
 
@@ -108,15 +135,16 @@ export default function PredictRealTimePage() {
         awayTeam,
         homePitcher,
         awayPitcher,
+        stadium,
         predictedWinner: data.predictions[0]?.예측승리팀 || '불명',
         probability: data.predictions[0]?.예측확률 || 0,
         confidence:
-          (data.predictions[0]?.예측확률 || 0) > 0.55
+          (data.predictions[0]?.예측확률 || 0) > 0.6
             ? '높음'
-            : (data.predictions[0]?.예측확률 || 0) > 0.5
+            : (data.predictions[0]?.예측확률 || 0) > 0.55
             ? '보통'
             : '낮음',
-        timestamp: new Date().toLocaleTimeString('ko-KR'),
+        timestamp: new Date().toLocaleString('ko-KR'),
       };
 
       setPrediction(result);
@@ -127,6 +155,11 @@ export default function PredictRealTimePage() {
     } finally {
       setPredicting(false);
     }
+  };
+
+  // 투수 정보 가져오기
+  const getPitcherInfo = (pitcherName: string, teamName: string) => {
+    return pitchers.find(p => p.name === pitcherName && p.team === teamName);
   };
 
   const getConfidenceColor = (confidence: string) => {
@@ -144,6 +177,14 @@ export default function PredictRealTimePage() {
 
   const getProbabilityPercentage = (prob: number) => {
     return Math.round(prob * 100);
+  };
+
+  // 히스토리 초기화
+  const clearHistory = () => {
+    if (confirm('예측 히스토리를 모두 삭제하시겠습니까?')) {
+      setPredictionHistory([]);
+      localStorage.removeItem('predictionHistory');
+    }
   };
 
   return (
@@ -183,6 +224,40 @@ export default function PredictRealTimePage() {
             </h2>
 
             <form onSubmit={handlePredict}>
+              {/* 구장 선택 추가 */}
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                    fontWeight: 'bold',
+                    color: '#333',
+                    fontSize: '0.95rem',
+                  }}
+                >
+                  🏟️ 구장
+                </label>
+                <select
+                  value={stadium}
+                  onChange={(e) => setStadium(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '8px',
+                    border: '2px solid #10b981',
+                    fontSize: '1rem',
+                    backgroundColor: '#fff',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {stadiums.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* 홈 팀 선택 */}
               <div style={{ marginBottom: '1.5rem' }}>
                 <label
@@ -198,7 +273,10 @@ export default function PredictRealTimePage() {
                 </label>
                 <select
                   value={homeTeam}
-                  onChange={(e) => setHomeTeam(e.target.value)}
+                  onChange={(e) => {
+                    setHomeTeam(e.target.value);
+                    setHomePitcher(''); // 팀 변경 시 투수 초기화
+                  }}
                   disabled={loading}
                   style={{
                     width: '100%',
@@ -253,10 +331,26 @@ export default function PredictRealTimePage() {
                     .filter((p) => p.team === homeTeam)
                     .map((pitcher) => (
                       <option key={pitcher.id} value={pitcher.name}>
-                        {pitcher.name} (ERA: {pitcher.era.toFixed(2)})
+                        {pitcher.name} (ERA: {pitcher.era.toFixed(2)}, WHIP: {pitcher.whip.toFixed(2)})
                       </option>
                     ))}
                 </select>
+                {/* 투수 정보 미리보기 */}
+                {homePitcher && homeTeam && (
+                  <div style={{
+                    marginTop: '0.5rem',
+                    padding: '0.75rem',
+                    backgroundColor: '#f0f9ff',
+                    borderRadius: '6px',
+                    fontSize: '0.85rem',
+                    color: '#0369a1'
+                  }}>
+                    {(() => {
+                      const info = getPitcherInfo(homePitcher, homeTeam);
+                      return info ? `📊 ERA: ${info.era.toFixed(2)} | WHIP: ${info.whip.toFixed(2)}` : '';
+                    })()}
+                  </div>
+                )}
               </div>
 
               {/* 상대 팀 선택 */}
@@ -274,7 +368,10 @@ export default function PredictRealTimePage() {
                 </label>
                 <select
                   value={awayTeam}
-                  onChange={(e) => setAwayTeam(e.target.value)}
+                  onChange={(e) => {
+                    setAwayTeam(e.target.value);
+                    setAwayPitcher(''); // 팀 변경 시 투수 초기화
+                  }}
                   disabled={loading}
                   style={{
                     width: '100%',
@@ -329,10 +426,26 @@ export default function PredictRealTimePage() {
                     .filter((p) => p.team === awayTeam)
                     .map((pitcher) => (
                       <option key={pitcher.id} value={pitcher.name}>
-                        {pitcher.name} (ERA: {pitcher.era.toFixed(2)})
+                        {pitcher.name} (ERA: {pitcher.era.toFixed(2)}, WHIP: {pitcher.whip.toFixed(2)})
                       </option>
                     ))}
                 </select>
+                {/* 투수 정보 미리보기 */}
+                {awayPitcher && awayTeam && (
+                  <div style={{
+                    marginTop: '0.5rem',
+                    padding: '0.75rem',
+                    backgroundColor: '#fef3f2',
+                    borderRadius: '6px',
+                    fontSize: '0.85rem',
+                    color: '#991b1b'
+                  }}>
+                    {(() => {
+                      const info = getPitcherInfo(awayPitcher, awayTeam);
+                      return info ? `📊 ERA: ${info.era.toFixed(2)} | WHIP: ${info.whip.toFixed(2)}` : '';
+                    })()}
+                  </div>
+                )}
               </div>
 
               {/* 에러 메시지 */}
@@ -390,6 +503,7 @@ export default function PredictRealTimePage() {
                 backgroundColor: '#fff',
                 borderRadius: '12px',
                 boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
+                animation: 'fadeIn 0.5s ease-in',
               }}
             >
               <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem', color: '#333' }}>
@@ -405,11 +519,14 @@ export default function PredictRealTimePage() {
                   marginBottom: '1.5rem',
                 }}
               >
-                <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.5rem' }}>
+                <div style={{ fontSize: '1rem', fontWeight: 'bold', color: '#333', marginBottom: '0.5rem' }}>
                   {prediction.homeTeam} vs {prediction.awayTeam}
                 </div>
-                <div style={{ fontSize: '0.8rem', color: '#999', marginBottom: '0.5rem' }}>
-                  {prediction.homePitcher} vs {prediction.awayPitcher}
+                <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.3rem' }}>
+                  🏟️ {prediction.stadium}
+                </div>
+                <div style={{ fontSize: '0.85rem', color: '#666' }}>
+                  ⚾ {prediction.homePitcher} vs {prediction.awayPitcher}
                 </div>
               </div>
 
@@ -420,12 +537,13 @@ export default function PredictRealTimePage() {
                 </h3>
                 <div
                   style={{
-                    fontSize: '1.8rem',
+                    fontSize: '2rem',
                     fontWeight: 'bold',
                     color: '#667eea',
+                    animation: 'pulse 1s ease-in-out',
                   }}
                 >
-                  {prediction.predictedWinner}
+                  🏆 {prediction.predictedWinner}
                 </div>
               </div>
 
@@ -449,7 +567,7 @@ export default function PredictRealTimePage() {
                         height: '100%',
                         width: `${getProbabilityPercentage(prediction.probability)}%`,
                         backgroundColor: '#667eea',
-                        transition: 'width 0.3s ease',
+                        transition: 'width 1s ease-out',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -507,9 +625,33 @@ export default function PredictRealTimePage() {
               boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
             }}
           >
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem', color: '#333' }}>
-              📜 예측 히스토리
-            </h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#333' }}>
+                📜 예측 히스토리
+              </h2>
+              <button
+                onClick={clearHistory}
+                style={{
+                  padding: '0.5rem 1rem',
+                  backgroundColor: '#ef4444',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '0.85rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                }}
+                onMouseOver={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#dc2626';
+                }}
+                onMouseOut={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#ef4444';
+                }}
+              >
+                🗑️ 히스토리 삭제
+              </button>
+            </div>
 
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -517,6 +659,9 @@ export default function PredictRealTimePage() {
                   <tr style={{ borderBottom: '2px solid #667eea' }}>
                     <th style={{ padding: '1rem', textAlign: 'left', color: '#666', fontWeight: 'bold' }}>
                       경기
+                    </th>
+                    <th style={{ padding: '1rem', textAlign: 'left', color: '#666', fontWeight: 'bold' }}>
+                      구장
                     </th>
                     <th style={{ padding: '1rem', textAlign: 'left', color: '#666', fontWeight: 'bold' }}>
                       예측 승리팀
@@ -543,6 +688,9 @@ export default function PredictRealTimePage() {
                     >
                       <td style={{ padding: '1rem', color: '#333', fontSize: '0.9rem' }}>
                         {pred.homeTeam} vs {pred.awayTeam}
+                      </td>
+                      <td style={{ padding: '1rem', color: '#666', fontSize: '0.85rem' }}>
+                        {pred.stadium}
                       </td>
                       <td style={{ padding: '1rem', color: '#333', fontWeight: 'bold' }}>
                         {pred.predictedWinner}
@@ -602,6 +750,29 @@ export default function PredictRealTimePage() {
           </Link>
         </div>
       </div>
+
+      {/* CSS 애니메이션 */}
+      <style jsx>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        @keyframes pulse {
+          0%, 100% {
+            transform: scale(1);
+          }
+          50% {
+            transform: scale(1.05);
+          }
+        }
+      `}</style>
     </main>
   );
 }

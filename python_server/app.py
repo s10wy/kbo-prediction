@@ -1,4 +1,4 @@
-# python_server/app.py (Content-Type 헤더 에러 해결)
+# python_server/app.py (전체 파일)
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -55,16 +55,16 @@ log_info(f"DB Host: {DB_HOST}")
 log_info(f"DB Port: {DB_PORT}")
 log_info(f"DB Name: {DB_NAME}")
 
-# ===== 모델 로드 (4개 Base Models + Meta Model) =====
+# ===== 모델 경로 설정 =====
+# 현재 파일의 디렉토리 경로를 기준으로 모델 폴더 찾기
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # kdy3 폴더
+MODELS_DIR = os.path.join(BASE_DIR, 'models')
+
+log_info(f"Base directory: {BASE_DIR}")
+log_info(f"Models directory: {MODELS_DIR}")
+
+# ===== 모델 로드 =====
 def load_models():
-    """
-    로드할 모델:
-    - Logistic Regression (빠름)
-    - XGBoost (강력함)
-    - LightGBM (빠르고 정확함)
-    - CatBoost (정확함)
-    - Meta Logistic (최종 예측)
-    """
     try:
         log_info("[MODEL LOADING] Starting model loading...")
         
@@ -72,37 +72,79 @@ def load_models():
         
         # 1. Logistic Regression
         log_info("  [1/6] Loading Logistic Regression model...")
-        with open("../models/logistic_model.pkl", "rb") as f:
+        logistic_path = os.path.join(MODELS_DIR, "logistic_model.pkl")
+        log_info(f"  Loading from: {logistic_path}")
+        
+        if not os.path.exists(logistic_path):
+            log_error(f"  ❌ Model file not found: {logistic_path}")
+            return None, None, None, None, None, None
+        
+        with open(logistic_path, "rb") as f:
             logistic_model = pickle.load(f)
         log_info("  [1/6] ✅ Logistic Regression loaded successfully")
         
         # 2. XGBoost
         log_info("  [2/6] Loading XGBoost model...")
-        with open("../models/xgb_model.pkl", "rb") as f:
+        xgb_path = os.path.join(MODELS_DIR, "xgb_model.pkl")
+        log_info(f"  Loading from: {xgb_path}")
+        
+        if not os.path.exists(xgb_path):
+            log_error(f"  ❌ Model file not found: {xgb_path}")
+            return None, None, None, None, None, None
+        
+        with open(xgb_path, "rb") as f:
             xgb_model = pickle.load(f)
         log_info("  [2/6] ✅ XGBoost loaded successfully")
         
         # 3. LightGBM
         log_info("  [3/6] Loading LightGBM model...")
-        with open("../models/lgbm_model.pkl", "rb") as f:
+        lgbm_path = os.path.join(MODELS_DIR, "lgbm_model.pkl")
+        log_info(f"  Loading from: {lgbm_path}")
+        
+        if not os.path.exists(lgbm_path):
+            log_error(f"  ❌ Model file not found: {lgbm_path}")
+            return None, None, None, None, None, None
+        
+        with open(lgbm_path, "rb") as f:
             lgbm_model = pickle.load(f)
         log_info("  [3/6] ✅ LightGBM loaded successfully")
         
         # 4. CatBoost
         log_info("  [4/6] Loading CatBoost model...")
-        with open("../models/cat_model.pkl", "rb") as f:
+        cat_path = os.path.join(MODELS_DIR, "cat_model.pkl")
+        log_info(f"  Loading from: {cat_path}")
+        
+        if not os.path.exists(cat_path):
+            log_error(f"  ❌ Model file not found: {cat_path}")
+            return None, None, None, None, None, None
+        
+        with open(cat_path, "rb") as f:
             cat_model = pickle.load(f)
         log_info("  [4/6] ✅ CatBoost loaded successfully")
         
         # 5. Meta Logistic
         log_info("  [5/6] Loading Meta Logistic model...")
-        with open("../models/meta_logistic.pkl", "rb") as f:
+        meta_path = os.path.join(MODELS_DIR, "meta_logistic.pkl")
+        log_info(f"  Loading from: {meta_path}")
+        
+        if not os.path.exists(meta_path):
+            log_error(f"  ❌ Model file not found: {meta_path}")
+            return None, None, None, None, None, None
+        
+        with open(meta_path, "rb") as f:
             meta_model = pickle.load(f)
         log_info("  [5/6] ✅ Meta Logistic loaded successfully")
         
         # 6. Encoder
         log_info("  [6/6] Loading Encoder...")
-        with open("../models/encoder.pkl", "rb") as f:
+        encoder_path = os.path.join(MODELS_DIR, "encoder.pkl")
+        log_info(f"  Loading from: {encoder_path}")
+        
+        if not os.path.exists(encoder_path):
+            log_error(f"  ❌ Model file not found: {encoder_path}")
+            return None, None, None, None, None, None
+        
+        with open(encoder_path, "rb") as f:
             encoder = pickle.load(f)
         log_info("  [6/6] ✅ Encoder loaded successfully")
         
@@ -112,6 +154,8 @@ def load_models():
         return logistic_model, xgb_model, lgbm_model, cat_model, meta_model, encoder
     except Exception as e:
         log_error(f"[MODEL LOADING] ❌ Model loading failed: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return None, None, None, None, None, None
 
 # 모델 전역 로드
@@ -199,7 +243,7 @@ def prepare_features(match_df, team_df, pitcher_df):
         log_debug("  [FEATURE] Starting feature engineering...")
         
         # 필요한 컬럼만 선택
-        team_df = team_df[['팀이름','시즌','랭킹','승률','경기차','연속승패','최근5경기','팀타율','팀득점',
+        team_df = team_df[['팀이름','시즌','랭킹','승률','팀타율','팀득점',
                             '팀홈런','팀OPS','팀평균자책','실책','WHIP','QS','세이브','홀드']]
         pitcher_df = pitcher_df[['이름','시즌','팀','평균자책','K/BB','WHIP','QS']]
 
@@ -258,7 +302,7 @@ def prepare_features(match_df, team_df, pitcher_df):
         log_error(f"  [FEATURE] ❌ Feature engineering failed: {str(e)}")
         return None
 
-# ===== 예측 (4개 모델 병렬 + Meta) =====
+# ===== 예측 =====
 def predict_single_model(model, X, model_name):
     """단일 모델 예측 (병렬 처리용)"""
     try:
@@ -269,9 +313,7 @@ def predict_single_model(model, X, model_name):
         return None
 
 def predict_games(match_df, encoder, logistic_model, xgb_model, lgbm_model, cat_model, meta_model):
-    """
-    4개 Base 모델로 예측 후 Meta 모델로 최종 예측 (병렬화)
-    """
+    """4개 Base 모델로 예측 후 Meta 모델로 최종 예측 (병렬화)"""
     try:
         log_debug("  [PREDICTION] Starting prediction...")
         
@@ -339,15 +381,10 @@ def health():
 
 @app.route('/predict', methods=['POST', 'GET'])
 def predict():
-    """
-    실시간 경기 예측 API
-    - GET: /predict?date=2025-03-15
-    - POST: {"date": "2025-03-15"}
-    """
+    """실시간 경기 예측 API"""
     request_id = f"[{datetime.now().strftime('%H:%M:%S')}]"
     
     try:
-        # 날짜 파라미터 받기
         if request.method == 'GET':
             date = request.args.get('date')
         else:
@@ -360,17 +397,14 @@ def predict():
             log_error(f"{request_id} [API] Missing date parameter")
             return jsonify({"error": "날짜 파라미터가 필요합니다 (YYYY-MM-DD)"}), 400
 
-        # 날짜 형식 검증
-        date_regex = r'^\d{4}-\d{2}-\d{2}$'
         import re
+        date_regex = r'^\d{4}-\d{2}-\d{2}$'
         if not re.match(date_regex, date):
             log_error(f"{request_id} [API] Invalid date format: {date}")
             return jsonify({"error": "올바른 날짜 형식이 필요합니다 (YYYY-MM-DD)"}), 400
 
-        # 전체 처리 시간 측정
         total_start = datetime.now()
 
-        # 1. 데이터 조회
         log_info(f"{request_id} [PROCESSING] Step 1/5: Querying game data...")
         match_df = get_games_by_date(date)
         if match_df.empty:
@@ -379,28 +413,24 @@ def predict():
 
         year = pd.to_datetime(date).year
         
-        # 2. 팀/투수 통계 조회 (병렬화)
         log_info(f"{request_id} [PROCESSING] Step 2/5: Querying team and pitcher stats...")
         team_future = executor.submit(get_team_stats, year)
         pitcher_future = executor.submit(get_pitcher_stats, year)
         team_df = team_future.result(timeout=30)
         pitcher_df = pitcher_future.result(timeout=30)
         
-        # 3. 피처 엔지니어링
         log_info(f"{request_id} [PROCESSING] Step 3/5: Feature engineering...")
         match_df = prepare_features(match_df, team_df, pitcher_df)
         if match_df is None:
             log_error(f"{request_id} [PROCESSING] Feature engineering failed")
             return jsonify({"error": "피처 엔지니어링 실패"}), 500
         
-        # 4. 예측 (병렬화)
-        log_info(f"{request_id} [PROCESSING] Step 4/5: Running prediction models (병렬 처리)...")
+        log_info(f"{request_id} [PROCESSING] Step 4/5: Running prediction models...")
         pred_labels, pred_probas = predict_games(match_df, encoder, logistic_model, xgb_model, lgbm_model, cat_model, meta_model)
         if pred_labels is None:
             log_error(f"{request_id} [PROCESSING] Prediction failed")
             return jsonify({"error": "예측 실패"}), 500
 
-        # 5. 결과 구성
         log_info(f"{request_id} [PROCESSING] Step 5/5: Formatting results...")
         results = []
         for idx, row in match_df.iterrows():
@@ -435,9 +465,7 @@ def predict():
 
     except Exception as e:
         log_error(f"{request_id} [API] ❌ Unhandled exception: {str(e)}")
-        return jsonify({
-            "error": f"서버 오류 발생: {str(e)}"
-        }), 500
+        return jsonify({"error": f"서버 오류 발생: {str(e)}"}), 500
 
 # ===== 커스텀 예측 API =====
 
@@ -461,7 +489,6 @@ def get_custom_team_stats(team_name: str, year: int = 2025):
         log_error(f"Failed to get team stats for {team_name}: {str(e)}")
         return pd.DataFrame()
 
-
 def get_custom_pitcher_stats(pitcher_name: str, team_name: str, year: int = 2025):
     """투수 통계 조회"""
     try:
@@ -482,11 +509,9 @@ def get_custom_pitcher_stats(pitcher_name: str, team_name: str, year: int = 2025
         log_error(f"Failed to get pitcher stats for {pitcher_name}: {str(e)}")
         return pd.DataFrame()
 
-
 @app.route('/api/teams-and-pitchers', methods=['GET', 'OPTIONS'])
 def get_teams_and_pitchers():
     """팀과 투수 목록 조회"""
-    # OPTIONS 요청 처리 (CORS preflight)
     if request.method == 'OPTIONS':
         return '', 200
     
@@ -499,12 +524,10 @@ def get_teams_and_pitchers():
             connect_args={'connect_timeout': 10}
         )
         
-        # 팀 목록 조회
         teams_query = 'SELECT DISTINCT "팀이름" as name FROM "seasonalTeamStats_Matches"."kbogamesteamsstats" WHERE "시즌" = 2025'
         teams_df = pd.read_sql(teams_query, engine)
         teams = [{'id': t, 'name': t} for t in sorted(teams_df['name'].tolist())]
         
-        # 투수 목록 조회
         pitchers_query = '''
         SELECT "이름" as name, "팀" as team, "평균자책" as era, "WHIP" as whip
         FROM "playerstats"."seasonal_pitcher_stats"
@@ -531,23 +554,22 @@ def get_teams_and_pitchers():
         log_error(f"Failed to get teams and pitchers: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+# python_server/app.py (수정된 커스텀 예측 부분만)
 
 @app.route('/api/predict-custom', methods=['POST', 'OPTIONS'])
 def predict_custom():
-    """커스텀 경기 예측"""
-    # OPTIONS 요청 처리 (CORS preflight)
+    """커스텀 경기 예측 - 구장 정보 포함"""
     if request.method == 'OPTIONS':
         return '', 200
     
     request_id = f"[{datetime.now().strftime('%H:%M:%S')}]"
     
     try:
-        # ===== FIX: Content-Type 검사 추가 =====
         # Content-Type 헤더 확인
         content_type = request.headers.get('Content-Type', '')
         log_debug(f"{request_id} Content-Type: {content_type}")
         
-        # JSON 데이터 파싱 (더 유연한 방식)
+        # JSON 데이터 파싱
         if request.is_json:
             data = request.get_json()
         elif request.data:
@@ -564,8 +586,9 @@ def predict_custom():
         away_team = data.get('awayTeam')
         home_pitcher = data.get('homePitcher')
         away_pitcher = data.get('awayPitcher')
+        stadium = data.get('stadium', '수원')  # ✅ 구장 정보 받기 (기본값: 수원)
         
-        log_info(f"{request_id} [API] Custom prediction: {home_team} vs {away_team}")
+        log_info(f"{request_id} [API] Custom prediction: {home_team} vs {away_team} at {stadium}")
         
         # 유효성 검사
         if not all([home_team, away_team, home_pitcher, away_pitcher]):
@@ -601,21 +624,102 @@ def predict_custom():
             log_error(f"{request_id} Away pitcher not found: {away_pitcher}")
             return jsonify({'error': f'상대 팀 투수 "{away_pitcher}" 정보를 찾을 수 없습니다.'}), 400
         
-        # 피처 생성
+        log_debug(f"{request_id} [DEBUG] All data retrieved successfully")
+        
+        # ===== 44개 피처 생성 (구장 정보 포함) =====
         features_dict = {
-            'starter_era_diff': float(away_pitcher_stats.get('평균자책', 0).values[0] - home_pitcher_stats.get('평균자책', 0).values[0]),
-            'starter_whip_diff': float(away_pitcher_stats.get('WHIP', 0).values[0] - home_pitcher_stats.get('WHIP', 0).values[0]),
-            'starter_kbb_diff': float(home_pitcher_stats.get('K/BB', 0).values[0] - away_pitcher_stats.get('K/BB', 0).values[0]),
-            'starter_qs_diff': float(home_pitcher_stats.get('QS', 0).values[0] - away_pitcher_stats.get('QS', 0).values[0]),
-            'winrate_diff': float(home_team_stats.get('승률', 0.5).values[0] - away_team_stats.get('승률', 0.5).values[0]),
-            'ops_diff': float(home_team_stats.get('팀OPS', 0).values[0] - away_team_stats.get('팀OPS', 0).values[0]),
-            'era_diff': float(away_team_stats.get('팀평균자책', 0).values[0] - home_team_stats.get('팀평균자책', 0).values[0]),
-            'whip_diff': float(away_team_stats.get('WHIP', 0).values[0] - home_team_stats.get('WHIP', 0).values[0]),
-            'rank_diff': float(away_team_stats.get('랭킹', 5).values[0] - home_team_stats.get('랭킹', 5).values[0]),
+            # 1. 구장 (사용자 입력값 사용) ✅
+            '구장': stadium,
+            
+            # 2. 선발 투수 이름
+            '홈선발': home_pitcher,
+            '원정선발': away_pitcher,
+            
+            # 3. 홈팀 통계 (15개)
+            'home_랭킹': float(home_team_stats.get('랭킹', 5).values[0]),
+            'home_승률': float(home_team_stats.get('승률', 0.5).values[0]),
+            'home_팀타율': float(home_team_stats.get('팀타율', 0.25).values[0]),
+            'home_팀득점': float(home_team_stats.get('팀득점', 4).values[0]),
+            'home_팀홈런': float(home_team_stats.get('팀홈런', 0.5).values[0]),
+            'home_팀OPS': float(home_team_stats.get('팀OPS', 0.7).values[0]),
+            'home_팀평균자책': float(home_team_stats.get('팀평균자책', 4).values[0]),
+            'home_실책': float(home_team_stats.get('실책', 0.5).values[0]),
+            'home_WHIP': float(home_team_stats.get('WHIP', 1.2).values[0]),
+            'home_QS': float(home_team_stats.get('QS', 0.5).values[0]),
+            'home_세이브': float(home_team_stats.get('세이브', 0).values[0]),
+            'home_홀드': float(home_team_stats.get('홀드', 0).values[0]),
+            
+            # 4. 원정팀 통계 (15개)
+            'away_랭킹': float(away_team_stats.get('랭킹', 5).values[0]),
+            'away_승률': float(away_team_stats.get('승률', 0.5).values[0]),
+            'away_팀타율': float(away_team_stats.get('팀타율', 0.25).values[0]),
+            'away_팀득점': float(away_team_stats.get('팀득점', 4).values[0]),
+            'away_팀홈런': float(away_team_stats.get('팀홈런', 0.5).values[0]),
+            'away_팀OPS': float(away_team_stats.get('팀OPS', 0.7).values[0]),
+            'away_팀평균자책': float(away_team_stats.get('팀평균자책', 4).values[0]),
+            'away_실책': float(away_team_stats.get('실책', 0.5).values[0]),
+            'away_WHIP': float(away_team_stats.get('WHIP', 1.2).values[0]),
+            'away_QS': float(away_team_stats.get('QS', 0.5).values[0]),
+            'away_세이브': float(away_team_stats.get('세이브', 0).values[0]),
+            'away_홀드': float(away_team_stats.get('홀드', 0).values[0]),
+            
+            # 5. 홈 투수 통계 (4개)
+            'homeSP_평균자책': float(home_pitcher_stats.get('평균자책', 4).values[0]),
+            'homeSP_K/BB': float(home_pitcher_stats.get('K/BB', 1.5).values[0]),
+            'homeSP_WHIP': float(home_pitcher_stats.get('WHIP', 1.2).values[0]),
+            'homeSP_QS': float(home_pitcher_stats.get('QS', 0.5).values[0]),
+            
+            # 6. 원정 투수 통계 (4개)
+            'awaySP_평균자책': float(away_pitcher_stats.get('평균자책', 4).values[0]),
+            'awaySP_K/BB': float(away_pitcher_stats.get('K/BB', 1.5).values[0]),
+            'awaySP_WHIP': float(away_pitcher_stats.get('WHIP', 1.2).values[0]),
+            'awaySP_QS': float(away_pitcher_stats.get('QS', 0.5).values[0]),
         }
         
-        # 피처 배열 생성
-        X = pd.DataFrame([features_dict])
+        # 7. Diff 피처 추가 (9개)
+        features_dict['starter_era_diff'] = features_dict['awaySP_평균자책'] - features_dict['homeSP_평균자책']
+        features_dict['starter_whip_diff'] = features_dict['awaySP_WHIP'] - features_dict['homeSP_WHIP']
+        features_dict['starter_kbb_diff'] = features_dict['homeSP_K/BB'] - features_dict['awaySP_K/BB']
+        features_dict['starter_qs_diff'] = features_dict['homeSP_QS'] - features_dict['awaySP_QS']
+        features_dict['winrate_diff'] = features_dict['home_승률'] - features_dict['away_승률']
+        features_dict['ops_diff'] = features_dict['home_팀OPS'] - features_dict['away_팀OPS']
+        features_dict['era_diff'] = features_dict['away_팀평균자책'] - features_dict['home_팀평균자책']
+        features_dict['whip_diff'] = features_dict['away_WHIP'] - features_dict['home_WHIP']
+        features_dict['rank_diff'] = features_dict['away_랭킹'] - features_dict['home_랭킹']
+        
+        log_debug(f"{request_id} [DEBUG] Created {len(features_dict)} features (구장: {stadium})")
+        
+        # DataFrame으로 변환 (모델이 필요한 피처 순서와 일치)
+        required_features = ['구장', '홈선발', '원정선발', 'home_랭킹', 'home_승률', 'home_팀타율', 'home_팀득점', 'home_팀홈런',
+                            'home_팀OPS', 'home_팀평균자책', 'home_실책', 'home_WHIP', 'home_QS', 'home_세이브',
+                            'home_홀드', 'away_랭킹', 'away_승률', 'away_팀타율', 'away_팀득점', 'away_팀홈런',
+                            'away_팀OPS', 'away_팀평균자책', 'away_실책', 'away_WHIP', 'away_QS', 'away_세이브',
+                            'away_홀드', 'homeSP_평균자책', 'homeSP_K/BB', 'homeSP_WHIP', 'homeSP_QS',
+                            'awaySP_평균자책', 'awaySP_K/BB', 'awaySP_WHIP', 'awaySP_QS', 'starter_era_diff',
+                            'starter_whip_diff', 'starter_kbb_diff', 'starter_qs_diff', 'winrate_diff',
+                            'ops_diff', 'era_diff', 'whip_diff', 'rank_diff']
+        
+        X = pd.DataFrame([features_dict])[required_features]
+        
+        log_debug(f"{request_id} [DEBUG] X shape: {X.shape}, required shape: (1, 44)")
+        
+        # 결측치 처리
+        object_cols = X.select_dtypes(include="object").columns
+        num_cols = X.select_dtypes(include=[np.number]).columns
+        
+        X[object_cols] = X[object_cols].fillna("Unknown")
+        X[num_cols] = X[num_cols].fillna(X[num_cols].mean())
+        
+        # 인코딩
+        if len(object_cols) > 0:
+            try:
+                X[object_cols] = encoder.transform(X[object_cols])
+            except Exception as e:
+                log_error(f"{request_id} Encoding error: {str(e)}")
+                # 인코딩 실패 시 기본값 사용
+                X[object_cols] = X[object_cols].fillna(0)
+        
+        log_debug(f"{request_id} [DEBUG] After encoding, X shape: {X.shape}")
         
         # 4개 모델 병렬 예측
         futures = {
@@ -627,9 +731,14 @@ def predict_custom():
         
         base_preds = np.zeros((1, 4))
         for idx, (name, future) in enumerate(futures.items()):
-            result = future.result(timeout=60)
-            if result is not None:
-                base_preds[0, idx] = result[0]
+            try:
+                result = future.result(timeout=60)
+                if result is not None:
+                    base_preds[0, idx] = result[0]
+                    log_debug(f"{request_id} [DEBUG] {name} prediction: {result[0]:.4f}")
+            except Exception as e:
+                log_error(f"{request_id} {name} prediction error: {str(e)}")
+                base_preds[0, idx] = 0.5  # 기본값
         
         # Meta 모델 예측
         meta_pred_proba = meta_model.predict_proba(base_preds)[:, 1][0]
@@ -642,13 +751,16 @@ def predict_custom():
         results = [{
             'gameId': f"custom_{datetime.now().timestamp()}",
             '날짜': datetime.now().isoformat(),
+            '구장': stadium,  # ✅ 구장 정보 포함
             '홈팀': home_team,
             '원정팀': away_team,
+            '홈선발': home_pitcher,
+            '원정선발': away_pitcher,
             '예측승리팀': predicted_winner,
             '예측확률': float(winner_prob),
         }]
         
-        log_info(f"{request_id} ✅ Custom prediction completed: {predicted_winner} ({winner_prob:.2%})")
+        log_info(f"{request_id} ✅ Custom prediction completed: {predicted_winner} ({winner_prob:.2%}) at {stadium}")
         
         return jsonify({
             'success': True,
@@ -661,6 +773,7 @@ def predict_custom():
         import traceback
         traceback.print_exc()
         return jsonify({'error': f'오류 발생: {str(e)}'}), 500
+
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 10000))

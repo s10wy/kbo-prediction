@@ -1,6 +1,1 @@
-# python_server/Procfile
-# Render에서 사용할 시작 명령어
-web: cd python_server && gunicorn -w 2 -b 0.0.0.0:$PORT --timeout 600 app:app
-
-
-
+web: gunicorn app:app --timeout 300 --workers 2
