@@ -1,4 +1,5 @@
-'use client';
+// src/app/main/page.tsx
+// 메인 페이지 컴포넌트
 'use client';
 import React from 'react';
 import Link from 'next/link';
