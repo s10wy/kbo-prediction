@@ -14,4 +14,3 @@ python-dotenv==1.0.0
 fsspec
 lightgbm==4.0.0
 catboost==1.2.0
-fsspec
