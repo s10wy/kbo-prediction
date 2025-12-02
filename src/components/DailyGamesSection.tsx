@@ -68,8 +68,10 @@ function GameCard({ match }: { match: Game }) {
   );
 }
 
-export default function DailyGamesSection({ initialDate = "2025-09-10" }: { initialDate?: string }) {
-  const [targetDate, setTargetDate] = useState<string>(initialDate);
+export default function DailyGamesSection({ initialDate }: { initialDate?: string }) {
+  // 오늘 날짜 구하기 (YYYY-MM-DD)
+  const today = toISO(new Date());
+  const [targetDate, setTargetDate] = useState<string>(initialDate || today);
   const [games, setGames] = useState<Game[]>([]);
   const [error, setError] = useState<string | null>(null);
 

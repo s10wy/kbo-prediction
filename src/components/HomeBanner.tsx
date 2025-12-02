@@ -55,20 +55,14 @@ export default function HomeBanner() {
             <li key={item.href}>
               <Link
                 href={item.href}
-                className={`navbar-link ${
-                  pathname === item.href ? "active" : ""
-                }`}
+                className={`navbar-link ${pathname === item.href ? "active" : ""
+                  }`}
               >
                 {item.name}
               </Link>
             </li>
           ))}
         </ul>
-
-        {/* ✅ 오른쪽 끝 버튼 */}
-        <button className="theme-toggle" onClick={toggleTheme}>
-          {theme === "light" ? "다크모드" : "라이트모드"}
-        </button>
       </div>
     </header>
   );

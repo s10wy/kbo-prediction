@@ -26,24 +26,25 @@ type Game = {
 export default function SeasonPage() {
   const [ranks, setRanks] = useState<TeamRank[]>([]);
   const [games, setGames] = useState<Game[]>([]);
+  const [seasons, setSeasons] = useState<string[]>([]);
+  const [selectedSeason, setSelectedSeason] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // 팀 순위 API
-    fetch('/api/team_ranks')
+    // 시즌 목록 가져오기
+    fetch('/api/seasons')
       .then(res => res.json())
       .then(data => {
-        if (Array.isArray(data)) {
-          setRanks(data);
-        } else if (Array.isArray(data.items)) {
-          setRanks(data.items);
-        } else {
-          setError('팀 순위 데이터를 불러올 수 없습니다.');
+        if (Array.isArray(data) && data.length > 0) {
+          setSeasons(data);
+          setSelectedSeason(data[0]); // 가장 최신 시즌 기본 선택
         }
       })
-      .catch(() => setError('팀 순위 데이터를 불러올 수 없습니다.'));
+      .catch(err => console.error('Failed to load seasons', err));
+  }, []);
 
-    // 경기 일정 / 결과 (예시)
+  useEffect(() => {
+    // 경기 일정 / 결과 (항상 표시)
     fetch('/api/today_games')
       .then(res => res.json())
       .then(data => {
@@ -58,6 +59,24 @@ export default function SeasonPage() {
       .catch(() => setGames([]));
   }, []);
 
+  useEffect(() => {
+    if (!selectedSeason) return;
+
+    // 팀 순위 API
+    fetch(`/api/team_ranks?year=${selectedSeason}`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setRanks(data);
+        } else if (Array.isArray(data.items)) {
+          setRanks(data.items);
+        } else {
+          setError('팀 순위 데이터를 불러올 수 없습니다.');
+        }
+      })
+      .catch(() => setError('팀 순위 데이터를 불러올 수 없습니다.'));
+  }, [selectedSeason]);
+
   // ✅ 소수점 3자리 포맷팅 함수
   const formatDecimal = (value: number): string => {
     return typeof value === 'number' ? value.toFixed(3) : '-';
@@ -65,9 +84,28 @@ export default function SeasonPage() {
 
   return (
     <main style={{ paddingTop: '120px', maxWidth: '1000px', margin: '0 auto' }}>
-      <h1 className="section-title" style={{ fontSize: '1.7rem', marginBottom: '1rem' }}>
-        📊 KBO 시즌 정보
-      </h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <h1 className="section-title" style={{ fontSize: '1.7rem', marginBottom: 0 }}>
+          📊 KBO 시즌 정보
+        </h1>
+        <select
+          value={selectedSeason}
+          onChange={(e) => setSelectedSeason(e.target.value)}
+          style={{
+            padding: '0.5rem 1rem',
+            fontSize: '1rem',
+            borderRadius: '8px',
+            border: '1px solid var(--color-border)',
+            backgroundColor: 'var(--color-bg-secondary)',
+            color: 'var(--color-text)',
+            cursor: 'pointer'
+          }}
+        >
+          {seasons.map(year => (
+            <option key={year} value={year}>{year} 시즌</option>
+          ))}
+        </select>
+      </div>
       <p style={{ color: 'var(--color-text)', opacity: 0.8, marginBottom: '1.5rem' }}>
         팀 순위, 경기 결과, 시즌 통계를 한눈에 확인해보세요.
       </p>
@@ -119,7 +157,7 @@ export default function SeasonPage() {
         </div>
       </section>
 
-      {/* ✅ 오늘의 경기 결과 */}
+      {/* ✅ 오늘의 경기 결과 (항상 표시) */}
       <section className="card" style={{ marginBottom: '2rem' }}>
         <h2 className="section-title">⚾ 오늘의 경기 결과</h2>
         {games.length === 0 ? (
@@ -144,35 +182,6 @@ export default function SeasonPage() {
             </tbody>
           </table>
         )}
-      </section>
-
-      {/* ✅ 시즌 통계 요약 */}
-      <section className="card" style={{ textAlign: 'center' }}>
-        <h2 className="section-title">📈 시즌 요약</h2>
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-around',
-            flexWrap: 'wrap',
-            gap: '1.2rem',
-            marginTop: '1rem',
-          }}
-        >
-          <div>
-            <h3 style={{ color: 'var(--color-primary)', fontSize: '1.2rem' }}>평균 승률</h3>
-            <p>{ranks.length > 0
-              ? (ranks.reduce((a, b) => a + parseFloat(b.win_rate), 0) / ranks.length).toFixed(3)
-              : '-'}</p>
-          </div>
-          <div>
-            <h3 style={{ color: 'var(--color-primary)', fontSize: '1.2rem' }}>전체 경기 수</h3>
-            <p>{ranks.reduce((a, b) => a + b.played, 0)}</p>
-          </div>
-          <div>
-            <h3 style={{ color: 'var(--color-primary)', fontSize: '1.2rem' }}>현재 구단 수</h3>
-            <p>{ranks.length || 0}개 팀</p>
-          </div>
-        </div>
       </section>
     </main>
   );

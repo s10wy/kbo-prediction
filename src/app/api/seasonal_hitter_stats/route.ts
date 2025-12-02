@@ -9,7 +9,7 @@ export async function GET() {
   // Pool에서 커넥션을 빌려 쿼리 실행
   try {
     const result = await pool.query(
-      `SELECT "ID", "이름", "선수이미지", "키", "몸무게", "등번호", "포지션", "팀", "시즌", "경기", "타석", "안타", "홈런", "타점"
+      `SELECT "ID", "이름", "선수이미지", "키", "몸무게", "등번호", "포지션", "팀", "시즌", "경기", "타석", "안타", "홈런", "타점", "득점", "2타", "3타", "도루", "볼넷", "사구", "삼진", "도루", "타율", "출루", "장타", "OPS", "IsoP", "BABIP", "wOBA", "wRC+", "WAR"
        FROM playerstats.seasonal_hitter_stats
        WHERE "시즌" = $1`,
       [year]
