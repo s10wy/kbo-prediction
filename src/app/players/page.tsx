@@ -1,14 +1,4 @@
 // src/app/players/page.tsx
-// Chart.js 등록
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend
-)
-
 'use client'
 import React, { useEffect, useState } from 'react'
 import Image from 'next/image'
@@ -22,6 +12,16 @@ import {
   Legend,
 } from 'chart.js'
 import { Bar } from 'react-chartjs-2'
+
+// Chart.js 등록
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+)
 
 // 타자
 type Hitter = {
