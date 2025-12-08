@@ -33,7 +33,7 @@ const CACHE_DURATION = 12 * 60 * 60 * 1000; // 12시간
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const query = searchParams.get('query') || 'KBO highlights';
+  const query = searchParams.get('query') || 'KBO야구';
   const forceRefresh = searchParams.get('refresh') === 'true';
 
   // count 값 가져오되, 최대 50, 최소 1 제한

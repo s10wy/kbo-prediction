@@ -25,7 +25,7 @@ export default function MainPage() {
         }}
       >
         <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
-          ⚾ KBO 야구 정보
+          KBO 야구 정보
         </h1>
         <p style={{ fontSize: '1.2rem', opacity: 0.9 }}>
           경기, 뉴스, 선수 정보 모두 한눈에!
@@ -37,7 +37,7 @@ export default function MainPage() {
         {/* 네비게이션 카드 */}
         <section style={{ marginBottom: '3rem' }}>
           <h2 style={{ fontSize: '1.8rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>
-            🎯 빠른 메뉴
+            빠른 메뉴
           </h2>
           <div
             style={{
@@ -47,28 +47,28 @@ export default function MainPage() {
             }}
           >
             <NavCard
-              icon="🔮"
+              icon=""
               title="실시간 예측"
               description="경기 예측하기"
               href="/predict-real-time"
               color="#667eea"
             />
             <NavCard
-              icon="📊"
+              icon=""
               title="누적 예측"
               description="시즌 결과 보기"
               href="/predict"
               color="#764ba2"
             />
             <NavCard
-              icon="🏆"
+              icon=""
               title="팀 순위"
               description="순위 조회"
               href="/season"
               color="#f093fb"
             />
             <NavCard
-              icon="🧾"
+              icon=""
               title="선수 정보"
               description="선수 기록 보기"
               href="/players"
@@ -79,7 +79,7 @@ export default function MainPage() {
 
         {/* 뉴스 섹션 */}
         <NewsSection />
-        
+
         {/* 유튜브 섹션 */}
         <YoutubeSection />
 

@@ -121,9 +121,9 @@ export default function NewsSection() {
               margin: 0,
             }}
           >
-            📰 최신 뉴스
+            최신 뉴스
           </h2>
-          
+
           {/* 새로고침 버튼 */}
           <button
             onClick={handleRefresh}
@@ -149,21 +149,21 @@ export default function NewsSection() {
               if (!loading) (e.currentTarget as HTMLButtonElement).style.opacity = '1';
             }}
           >
-            {loading ? '⏳' : '🔄'} {loading ? '불러오는 중...' : '새로고침'}
+            {loading ? '' : ''} {loading ? '불러오는 중...' : '새로고침'}
           </button>
         </div>
-        
+
         <p style={{ color: '#666', fontSize: '0.95rem', opacity: 0.8, margin: 0 }}>
           KBO 야구의 최신 뉴스와 소식을 한눈에 확인하세요
         </p>
-        
+
         {/* 캐시 정보 */}
         {apiInfo && !loading && (
           <div style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.5rem' }}>
             {apiInfo.cached ? (
-              `💾 캐시된 데이터 (${apiInfo.cacheAge}초 전)`
+              `캐시된 데이터 (${apiInfo.cacheAge}초 전)`
             ) : (
-              `🆕 최신 데이터 (${new Date(apiInfo.timestamp).toLocaleTimeString('ko-KR')})`
+              `최신 데이터 (${new Date(apiInfo.timestamp).toLocaleTimeString('ko-KR')})`
             )}
           </div>
         )}
@@ -181,7 +181,7 @@ export default function NewsSection() {
             fontSize: '0.95rem',
           }}
         >
-          ⚠️ {error}
+          {error}
         </div>
       )}
 
@@ -195,7 +195,7 @@ export default function NewsSection() {
             fontSize: '0.95rem',
           }}
         >
-          📰 뉴스 데이터를 불러오는 중입니다...
+          뉴스 데이터를 불러오는 중입니다...
         </div>
       ) : news.length > 0 ? (
         <div
@@ -252,7 +252,7 @@ export default function NewsSection() {
                 (e.currentTarget as HTMLButtonElement).style.transform = 'none';
               }}
             >
-              📰 네이버 스포츠에서 더 보기
+              네이버 스포츠에서 더 보기
             </button>
           </a>
         </div>

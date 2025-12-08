@@ -156,7 +156,7 @@ export default function PredictRealTimePage() {
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
             min="2009-01-01"
-            max="2024-12-31"
+            max="2025-12-31"
             style={{
               padding: '0.75rem 1rem',
               borderRadius: '0.5rem',

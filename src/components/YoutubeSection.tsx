@@ -107,9 +107,9 @@ export default function YoutubeSection() {
               margin: 0,
             }}
           >
-            📺 야구 유튜브 영상
+            야구 유튜브 영상
           </h2>
-          
+
           {/* 새로고침 버튼 */}
           <button
             onClick={handleRefresh}
@@ -135,21 +135,21 @@ export default function YoutubeSection() {
               if (!loading) (e.currentTarget as HTMLButtonElement).style.opacity = '1';
             }}
           >
-            {loading ? '⏳' : '🔄'} {loading ? '불러오는 중...' : '새로고침'}
+            {loading ? '' : ''} {loading ? '불러오는 중...' : '새로고침'}
           </button>
         </div>
-        
+
         <p style={{ color: '#666', fontSize: '0.95rem', opacity: 0.8, margin: 0 }}>
           KBO 야구의 최신 영상과 분석을 감상하세요
         </p>
-        
+
         {/* 캐시 정보 */}
         {apiInfo && !loading && (
           <div style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.5rem' }}>
             {apiInfo.cached ? (
-              `💾 캐시된 데이터 (${apiInfo.cacheAge}초 전)`
+              `캐시된 데이터 (${apiInfo.cacheAge}초 전)`
             ) : (
-              `🆕 최신 데이터 (${new Date(apiInfo.timestamp).toLocaleTimeString('ko-KR')})`
+              `최신 데이터 (${new Date(apiInfo.timestamp).toLocaleTimeString('ko-KR')})`
             )}
           </div>
         )}
@@ -167,7 +167,7 @@ export default function YoutubeSection() {
             fontSize: '0.95rem',
           }}
         >
-          ⚠️ {error}
+          {error}
         </div>
       )}
 
@@ -181,7 +181,7 @@ export default function YoutubeSection() {
             fontSize: '0.95rem',
           }}
         >
-          📺 유튜브 영상 데이터를 불러오는 중입니다...
+          유튜브 영상 데이터를 불러오는 중입니다...
         </div>
       ) : videos.length > 0 ? (
         <div
@@ -238,7 +238,7 @@ export default function YoutubeSection() {
                 (e.currentTarget as HTMLButtonElement).style.transform = 'none';
               }}
             >
-              📺 유튜브에서 더 보기
+              유튜브에서 더 보기
             </button>
           </a>
         </div>
@@ -405,7 +405,7 @@ function VideoCard({ video, index }: VideoCardProps) {
 
           {/* 채널 이름 */}
           <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '0.8rem' }}>
-            📺 {decodeEntities(video.channelTitle)}
+            {decodeEntities(video.channelTitle)}
           </div>
 
           {/* 링크 표시 */}

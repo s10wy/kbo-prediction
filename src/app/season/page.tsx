@@ -86,7 +86,7 @@ export default function SeasonPage() {
     <main style={{ paddingTop: '120px', maxWidth: '1000px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
         <h1 className="section-title" style={{ fontSize: '1.7rem', marginBottom: 0 }}>
-          📊 KBO 시즌 정보
+          KBO 시즌 정보
         </h1>
         <select
           value={selectedSeason}
@@ -112,7 +112,7 @@ export default function SeasonPage() {
 
       {/* ✅ 팀 순위 테이블 */}
       <section className="card" style={{ marginBottom: '2rem' }}>
-        <h2 className="section-title">🏆 팀 순위</h2>
+        <h2 className="section-title">팀 순위</h2>
         <div className="table-scroll">
           <table>
             <thead>
@@ -159,7 +159,7 @@ export default function SeasonPage() {
 
       {/* ✅ 오늘의 경기 결과 (항상 표시) */}
       <section className="card" style={{ marginBottom: '2rem' }}>
-        <h2 className="section-title">⚾ 오늘의 경기 결과</h2>
+        <h2 className="section-title">오늘의 경기 결과</h2>
         {games.length === 0 ? (
           <p className="loading">오늘 경기 정보가 없습니다.</p>
         ) : (

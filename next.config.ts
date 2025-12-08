@@ -1,17 +1,22 @@
 import type { NextConfig } from "next";
 
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+if (process.env.NODE_ENV === 'development') {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+}
+
+const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       {
+        protocol: 'http',
+        hostname: '**',
+      },
+      {
         protocol: 'https',
-        hostname: 'sports-phinf.pstatic.net',
+        hostname: '**',
       },
     ],
   },
 };
-
-module.exports = nextConfig;
 
 export default nextConfig;

@@ -52,7 +52,7 @@ export default function IntroPage() {
               animation: 'fadeInDown 1s ease-out',
             }}
           >
-            🔮 KBO 야구 <br /> 승부 예측 시스템
+            KBO 야구 <br /> 승부 예측 시스템
           </h1>
 
           <p
@@ -102,7 +102,7 @@ export default function IntroPage() {
                   e.currentTarget.style.boxShadow = '0 10px 30px rgba(0,0,0,0.2)';
                 }}
               >
-                🚀 시작하기
+                시작하기
               </button>
             </Link>
 
@@ -131,7 +131,7 @@ export default function IntroPage() {
                   e.currentTarget.style.color = '#fff';
                 }}
               >
-                📖 더 알아보기
+                더 알아보기
               </button>
             </a>
           </div>
@@ -193,7 +193,7 @@ export default function IntroPage() {
             color: '#333',
           }}
         >
-          🎯 주요 기능
+          주요 기능
         </h2>
 
         <div
@@ -205,7 +205,7 @@ export default function IntroPage() {
         >
           {/* 기능 카드 1 */}
           <FeatureCard
-            icon="🔮"
+            icon=""
             title="실시간 예측"
             description="특정 날짜의 경기를 선택하여 AI 모델의 실시간 예측을 즉시 확인"
             stats="약 2-3초 응답"
@@ -213,7 +213,7 @@ export default function IntroPage() {
 
           {/* 기능 카드 2 */}
           <FeatureCard
-            icon="📊"
+            icon=""
             title="누적 예측 결과"
             description="2025년 3월~11월 경기에 대한 축적된 예측 결과 및 정확도 분석"
             stats="55% 정확도"
@@ -221,7 +221,7 @@ export default function IntroPage() {
 
           {/* 기능 카드 3 */}
           <FeatureCard
-            icon="🏆"
+            icon=""
             title="팀 순위 정보"
             description="실시간 팀 순위, 승률, 타율, 방어율 등 다양한 통계 데이터"
             stats="10개 구단"
@@ -229,7 +229,7 @@ export default function IntroPage() {
 
           {/* 기능 카드 4 */}
           <FeatureCard
-            icon="🧾"
+            icon=""
             title="선수 정보"
             description="구단별 선수의 타자/투수 기록 및 시즌 통계 조회"
             stats="500+ 선수"
@@ -237,7 +237,7 @@ export default function IntroPage() {
 
           {/* 기능 카드 5 */}
           <FeatureCard
-            icon="📈"
+            icon=""
             title="시즌 통계"
             description="팀별 평균 승률, 전체 경기 수, 구단별 분석 데이터"
             stats="2009-2024년"
@@ -245,7 +245,7 @@ export default function IntroPage() {
 
           {/* 기능 카드 6 */}
           <FeatureCard
-            icon="⚡"
+            icon=""
             title="고속 응답"
             description="Vercel + Python 최적화로 빠른 처리 속도 제공"
             stats="75% 개선"
@@ -271,7 +271,7 @@ export default function IntroPage() {
             margin: '0 auto 3rem',
           }}
         >
-          🛠️ 기술 스택
+          기술 스택
         </h2>
 
         <div
@@ -301,7 +301,7 @@ export default function IntroPage() {
             color: '#333',
           }}
         >
-          🤖 AI 모델 정보
+          AI 모델 정보
         </h2>
 
         <div
@@ -316,21 +316,21 @@ export default function IntroPage() {
             description="기본 예측 모델"
             accuracy="54%"
             speed="매우 빠름"
-            status="✅ 사용 중"
+            status="사용 중"
           />
           <ModelInfo
             name="Meta Learning"
             description="최종 앙상블 모델"
             accuracy="55%"
             speed="빠름"
-            status="✅ 사용 중"
+            status="사용 중"
           />
           <ModelInfo
             name="학습 데이터"
             description="KBO 경기 데이터"
             accuracy="16년"
             speed="2009-2024"
-            status="✅ 완료"
+            status="완료"
           />
         </div>
       </section>
@@ -374,7 +374,7 @@ export default function IntroPage() {
               e.currentTarget.style.boxShadow = '0 10px 30px rgba(0,0,0,0.2)';
             }}
           >
-            🚀 메인 페이지로 이동
+            메인 페이지로 이동
           </button>
         </Link>
       </section>
@@ -389,7 +389,7 @@ export default function IntroPage() {
           fontSize: '0.9rem',
         }}
       >
-        <p>⚾ KBO 야구 예측 시스템 © 2025 - AI 기반 경기 예측</p>
+        <p>KBO 야구 예측 시스템 © 2025 - AI 기반 경기 예측</p>
         <p style={{ marginTop: '0.5rem', opacity: 0.7 }}>
           Vercel + Render + PostgreSQL로 제공되는 프로덕션 서비스
         </p>
@@ -476,7 +476,7 @@ function TechStack({ title, items }: TechStackProps) {
       <ul style={{ listStyle: 'none', padding: 0 }}>
         {items.map((item: string, i: number) => (
           <li key={i} style={{ padding: '0.5rem 0', color: '#666' }}>
-            ✓ {item}
+            {item}
           </li>
         ))}
       </ul>

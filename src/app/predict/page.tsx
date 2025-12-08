@@ -349,6 +349,8 @@ export default function PredictPage() {
             </label>
             <input
               type="date"
+              min="2025-01-01"
+              max="2025-12-31"
               value={tempFilters.startDate}
               onChange={(e) => {
                 setTempFilters(prev => ({
@@ -377,6 +379,8 @@ export default function PredictPage() {
             </label>
             <input
               type="date"
+              min="2025-01-01"
+              max="2025-12-31"
               value={tempFilters.endDate}
               onChange={(e) => {
                 setTempFilters(prev => ({
